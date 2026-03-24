@@ -5,39 +5,19 @@ import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { createBrowserClient } from "@/lib/supabase/client";
 import AvatarDisplay from "@/components/AvatarDisplay";
+import AvatarBuilder from "@/components/AvatarBuilder";
+import {
+  type AvatarConfig,
+  DEFAULT_CONFIG,
+  buildAvatarUrl,
+  parseAvatarUrl,
+} from "@/lib/avatarConfig";
 
 /* ------------------------------------------------------------------ */
-/*  Constants                                                          */
+/*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-const DICEBEAR_STYLES = [
-  { id: "adventurer", label: "Adventurer", desc: "Cute illustrated faces" },
-  { id: "avataaars", label: "Avataaars", desc: "Bitmoji-like" },
-  { id: "big-ears", label: "Big Ears", desc: "Fun cartoon" },
-  { id: "lorelei", label: "Lorelei", desc: "Artistic line art" },
-  { id: "notionists", label: "Notionists", desc: "Clean modern" },
-  { id: "thumbs", label: "Thumbs", desc: "Playful characters" },
-] as const;
-
-type DiceBearStyle = (typeof DICEBEAR_STYLES)[number]["id"];
-
-function buildDiceBearUrl(style: string, seed: string): string {
-  return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
-}
-
-function generateRandomSeed(): string {
-  return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-}
-
-function parseDiceBearUrl(url: string): { style: string; seed: string } | null {
-  const match = url.match(
-    /api\.dicebear\.com\/9\.x\/([^/]+)\/svg\?seed=(.+)/
-  );
-  if (!match) return null;
-  return { style: match[1], seed: decodeURIComponent(match[2]) };
-}
-
-type AvatarMode = "dicebear" | "upload";
+type AvatarMode = "build" | "upload";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -59,11 +39,12 @@ export default function ProfilePage() {
   const [dragOver, setDragOver] = useState(false);
 
   // Avatar mode
-  const [mode, setMode] = useState<AvatarMode>("dicebear");
+  const [mode, setMode] = useState<AvatarMode>("build");
 
-  // DiceBear state
-  const [selectedStyle, setSelectedStyle] = useState<DiceBearStyle>("adventurer");
-  const [seed, setSeed] = useState("");
+  // AvatarBuilder config state
+  const [config, setConfig] = useState<AvatarConfig>(DEFAULT_CONFIG);
+
+  /* ---- Auth redirect ---- */
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -71,49 +52,42 @@ export default function ProfilePage() {
     }
   }, [authLoading, user, router]);
 
+  /* ---- Hydrate from profile ---- */
+
   useEffect(() => {
     if (profile) {
       setDisplayName(profile.display_name ?? "");
       setAvatarUrl(profile.avatar_url ?? null);
 
-      // Parse existing avatar
       if (profile.avatar_url) {
-        const parsed = parseDiceBearUrl(profile.avatar_url);
+        const parsed = parseAvatarUrl(profile.avatar_url);
         if (parsed) {
-          const matchedStyle = DICEBEAR_STYLES.find((s) => s.id === parsed.style);
-          if (matchedStyle) {
-            setSelectedStyle(matchedStyle.id);
-            setSeed(parsed.seed);
-            setMode("dicebear");
-          }
+          setConfig(parsed);
+          setMode("build");
         } else if (
           !profile.avatar_url.startsWith("emoji:") &&
           !profile.avatar_url.startsWith("initials:")
         ) {
           // It's an uploaded image URL
           setMode("upload");
+        } else {
+          setConfig(DEFAULT_CONFIG);
+          setMode("build");
         }
-      }
-
-      // Default seed from display name
-      if (!seed) {
-        setSeed(profile.display_name ?? "");
+      } else {
+        setConfig(DEFAULT_CONFIG);
       }
     } else if (user) {
       const name = user.user_metadata?.display_name ?? user.email ?? "";
       setDisplayName(name);
-      setSeed(name);
+      setConfig(DEFAULT_CONFIG);
     }
   }, [user, profile]);
 
-  // Derive the current DiceBear URL
-  const currentDiceBearUrl = buildDiceBearUrl(
-    selectedStyle,
-    seed || displayName || "default"
-  );
+  /* ---- Derived URLs ---- */
 
-  // The preview URL based on mode
-  const previewUrl = mode === "dicebear" ? currentDiceBearUrl : avatarUrl;
+  const currentBuildUrl = buildAvatarUrl(config);
+  const previewUrl = mode === "build" ? currentBuildUrl : avatarUrl;
 
   /* ---- Upload ---- */
 
@@ -179,12 +153,6 @@ export default function ProfilePage() {
     if (file) uploadAvatar(file);
   };
 
-  /* ---- Randomize ---- */
-
-  const handleRandomize = () => {
-    setSeed(generateRandomSeed());
-  };
-
   /* ---- Save ---- */
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -194,8 +162,7 @@ export default function ProfilePage() {
     setSaving(true);
     setMessage(null);
 
-    const finalAvatarUrl =
-      mode === "dicebear" ? currentDiceBearUrl : avatarUrl;
+    const finalAvatarUrl = mode === "build" ? currentBuildUrl : avatarUrl;
 
     const supabase = createBrowserClient();
     const { error } = await supabase.from("profiles").upsert({
@@ -208,7 +175,7 @@ export default function ProfilePage() {
     if (error) {
       setMessage({ type: "error", text: error.message });
     } else {
-      setAvatarUrl(finalAvatarUrl);
+      setAvatarUrl(finalAvatarUrl ?? null);
       setMessage({ type: "success", text: "Profile updated successfully!" });
     }
 
@@ -236,96 +203,92 @@ export default function ProfilePage() {
         {/* Header */}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-            Your Profile
+            Your Poker Identity
           </h1>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             Customize how you appear at the table
           </p>
         </div>
 
-        {/* Large Preview */}
+        {/* Preview Section */}
         <div className="card-surface">
-          <h2 className="mb-4 text-center text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Your Avatar
-          </h2>
-          <div className="flex justify-center">
-            <div className="relative">
-              <div className="absolute -inset-2 rounded-full bg-felt-400/15 blur-lg" />
-              <div className="relative overflow-hidden rounded-full border-[3px] border-felt-400/50 shadow-xl">
-                <div
-                  className="rounded-full overflow-hidden"
-                  style={{ width: "120px", height: "120px" }}
-                >
-                  {previewUrl ? (
-                    <img
-                      src={previewUrl}
-                      alt="Avatar preview"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-felt-500 to-felt-700 text-3xl font-bold text-white">
-                      {displayName?.[0]?.toUpperCase() ?? "?"}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 text-center text-sm font-semibold text-chip-gold">
-            {displayName || "Your Name"}
-          </div>
-        </div>
-
-        {/* Table Preview */}
-        <div className="card-surface">
-          <h2 className="mb-4 text-center text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Table Preview
-          </h2>
-          <div className="flex justify-center">
-            <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/[0.06] bg-gradient-to-b from-felt-900/40 to-black/30 px-10 py-5">
-              {/* Glow ring */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 sm:gap-10">
+            {/* Left: Large avatar preview */}
+            <div className="flex flex-col items-center gap-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                Your Avatar
+              </h2>
               <div className="relative">
-                <div className="absolute -inset-1.5 rounded-full bg-felt-400/20 blur-md" />
-                <div className="relative overflow-hidden rounded-full border-[2.5px] border-felt-400/60 shadow-lg">
-                  <AvatarDisplay
-                    avatarUrl={previewUrl}
-                    displayName={displayName}
-                    size="lg"
-                  />
+                <div className="absolute -inset-3 rounded-full bg-felt-400/20 blur-xl" />
+                <div className="relative overflow-hidden rounded-full border-[3px] border-felt-400/50 shadow-xl">
+                  <div
+                    className="rounded-full overflow-hidden"
+                    style={{ width: "120px", height: "120px" }}
+                  >
+                    {previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt="Avatar preview"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-felt-500 to-felt-700 text-3xl font-bold text-white">
+                        {displayName?.[0]?.toUpperCase() ?? "?"}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="mt-1 text-sm font-semibold text-chip-gold">
+              <div className="text-sm font-semibold text-chip-gold">
                 {displayName || "Your Name"}
               </div>
-              <div className="flex items-center gap-1 text-sm font-bold text-felt-300">
-                <span className="text-felt-400/60">$</span>
-                1,000
+            </div>
+
+            {/* Right: Table Preview */}
+            <div className="flex flex-col items-center gap-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                Table Preview
+              </h2>
+              <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/[0.06] bg-gradient-to-b from-felt-900/40 to-black/30 px-10 py-5">
+                {/* Glow ring */}
+                <div className="relative">
+                  <div className="absolute -inset-1.5 rounded-full bg-felt-400/20 blur-md" />
+                  <div className="relative overflow-hidden rounded-full border-[2.5px] border-felt-400/60 shadow-lg">
+                    <AvatarDisplay
+                      avatarUrl={previewUrl}
+                      displayName={displayName}
+                      size="lg"
+                    />
+                  </div>
+                </div>
+                <div className="mt-1 text-sm font-semibold text-chip-gold">
+                  {displayName || "Your Name"}
+                </div>
+                <div className="flex items-center gap-1 text-sm font-bold text-felt-300">
+                  <span className="text-felt-400/60">$</span>
+                  1,000
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Avatar Selection */}
+        {/* Mode Tabs */}
         <div className="card-surface">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Avatar
-          </h2>
-
-          {/* Mode Tabs */}
-          <div className="mb-5 flex gap-1 rounded-xl bg-black/30 p-1">
+          <div className="mb-5 flex gap-1 rounded-full bg-black/30 p-1">
             <button
-              onClick={() => setMode("dicebear")}
-              className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                mode === "dicebear"
+              onClick={() => setMode("build")}
+              className={`flex-1 rounded-full px-4 py-2.5 text-sm font-medium transition-all ${
+                mode === "build"
                   ? "bg-felt-700/60 text-[var(--color-text-primary)] shadow-sm"
                   : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-white/[0.03]"
               }`}
             >
-              Choose Avatar
+              Build Avatar
             </button>
             <button
               onClick={() => setMode("upload")}
-              className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+              className={`flex-1 rounded-full px-4 py-2.5 text-sm font-medium transition-all ${
                 mode === "upload"
                   ? "bg-felt-700/60 text-[var(--color-text-primary)] shadow-sm"
                   : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-white/[0.03]"
@@ -335,85 +298,12 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          {/* DiceBear Style Picker */}
-          {mode === "dicebear" && (
-            <div className="space-y-5">
-              {/* Style Cards - horizontal scrollable row */}
-              <div>
-                <p className="mb-2.5 text-xs font-medium text-[var(--color-text-secondary)]">
-                  Pick a style
-                </p>
-                <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-                  {DICEBEAR_STYLES.map((style) => {
-                    const previewSeed = seed || displayName || "default";
-                    const stylePreviewUrl = buildDiceBearUrl(style.id, previewSeed);
-                    const isSelected = selectedStyle === style.id;
-                    return (
-                      <button
-                        key={style.id}
-                        onClick={() => setSelectedStyle(style.id)}
-                        className={`flex flex-col items-center gap-2 rounded-xl p-3 transition-all min-w-[100px] ${
-                          isSelected
-                            ? "bg-felt-700/40 ring-2 ring-felt-400 shadow-lg shadow-felt-500/20"
-                            : "bg-black/30 hover:bg-white/[0.06]"
-                        }`}
-                      >
-                        <div className="h-14 w-14 overflow-hidden rounded-full border border-white/10 bg-white/5">
-                          <img
-                            src={stylePreviewUrl}
-                            alt={style.label}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <div className="text-center">
-                          <div
-                            className={`text-xs font-semibold ${
-                              isSelected
-                                ? "text-felt-300"
-                                : "text-[var(--color-text-primary)]"
-                            }`}
-                          >
-                            {style.label}
-                          </div>
-                          <div className="text-[10px] text-[var(--color-text-secondary)]">
-                            {style.desc}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Randomize Button */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleRandomize}
-                  className="flex items-center gap-2 rounded-lg bg-felt-700/40 px-4 py-2.5 text-sm font-medium text-felt-300 transition hover:bg-felt-700/60 hover:text-felt-200"
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-                  </svg>
-                  Randomize Face
-                </button>
-                <span className="text-xs text-[var(--color-text-secondary)]">
-                  Get a different look in this style
-                </span>
-              </div>
-            </div>
+          {/* Build Avatar Mode */}
+          {mode === "build" && (
+            <AvatarBuilder config={config} onConfigChange={setConfig} />
           )}
 
-          {/* Upload Photo */}
+          {/* Upload Photo Mode */}
           {mode === "upload" && (
             <div className="space-y-4">
               <div
@@ -510,16 +400,10 @@ export default function ProfilePage() {
         {/* Profile Form */}
         <div className="card-surface">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-            Details
+            Display Name
           </h2>
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div>
-              <label
-                htmlFor="displayName"
-                className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]"
-              >
-                Display Name
-              </label>
               <input
                 id="displayName"
                 type="text"
@@ -529,25 +413,6 @@ export default function ProfilePage() {
                 className="w-full rounded-lg border border-white/10 bg-[var(--color-bg)] px-4 py-2.5 text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] outline-none transition focus:border-felt-500 focus:ring-1 focus:ring-felt-500"
                 placeholder="Your display name"
               />
-            </div>
-
-            <div>
-              <label
-                htmlFor="email"
-                className="mb-1 block text-sm font-medium text-[var(--color-text-secondary)]"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={user.email ?? ""}
-                disabled
-                className="w-full rounded-lg border border-white/10 bg-[var(--color-bg)] px-4 py-2.5 text-[var(--color-text-secondary)] opacity-60"
-              />
-              <p className="mt-1 text-xs text-[var(--color-text-secondary)]/60">
-                Email cannot be changed
-              </p>
             </div>
 
             {message && (

@@ -5,7 +5,7 @@ import { useState } from "react";
 interface AvatarDisplayProps {
   avatarUrl: string | null | undefined;
   displayName: string | null | undefined;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "xxl";
   className?: string;
 }
 
@@ -14,6 +14,7 @@ const SIZE_MAP = {
   md: { px: 48, text: "text-sm" },
   lg: { px: 64, text: "text-base" },
   xl: { px: 96, text: "text-xl" },
+  xxl: { px: 128, text: "text-2xl" },
 } as const;
 
 function getInitials(name: string | null | undefined): string {
@@ -28,7 +29,7 @@ function getInitials(name: string | null | undefined): string {
 
 function getDefaultDiceBearUrl(displayName: string | null | undefined): string {
   const seed = encodeURIComponent(displayName?.trim() || "default");
-  return `https://api.dicebear.com/9.x/adventurer/svg?seed=${seed}`;
+  return `https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}`;
 }
 
 export default function AvatarDisplay({
