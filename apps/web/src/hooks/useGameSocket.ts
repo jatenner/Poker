@@ -25,6 +25,7 @@ export interface GameSocketState {
   gameResults: GameResult[] | null;
   error: string | null;
   connected: boolean;
+  serverLegalActions: string[];
 }
 
 export interface GameSocketActions {
@@ -50,6 +51,7 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
   const [gameResults, setGameResults] = useState<GameResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [serverLegalActions, setServerLegalActions] = useState<string[]>([]);
 
   // Helper to append to action log
   const appendLog = useCallback((entry: ActionLogEntry) => {
@@ -153,16 +155,33 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
         }
       );
 
-      // Action required (tells us whose turn it is)
+      // Private hole cards (sent individually to each player)
+      socket.on(
+        "game:privateCards",
+        (data: { holeCards: [Card, Card] }) => {
+          if (cancelled) return;
+          if (data.holeCards) {
+            setHoleCards(data.holeCards);
+          }
+        }
+      );
+
+      // Action required (tells us whose turn it is + legal actions)
       socket.on(
         ServerEvents.ACTION_REQUIRED,
         (data: {
+          userId?: string;
+          seatNumber?: number;
+          legalActions?: { type: string; minAmount?: number; maxAmount?: number }[];
           tableState?: PublicTableState;
           players?: PublicPlayerState[];
         }) => {
           if (cancelled) return;
           if (data.tableState) setTableState(data.tableState);
           if (data.players) setPlayers(data.players);
+          if (data.legalActions) {
+            setServerLegalActions(data.legalActions.map((a: any) => a.action ?? a.type ?? a));
+          }
         }
       );
 
@@ -204,16 +223,16 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
       // Hand result
       socket.on(
         ServerEvents.HAND_RESULT,
-        (data: {
-          result: HandResult;
-          tableState?: PublicTableState;
-          players?: PublicPlayerState[];
-        }) => {
+        (data: any) => {
           if (cancelled) return;
-          setHandResult(data.result);
+          // Server sends { winners, potResults, showdownCards, ... }
+          // OR { result: { winners, potResults }, ... }
+          const result: HandResult = data.result ?? { winners: data.winners ?? [], potResults: data.potResults ?? [] };
+          setHandResult(result);
           if (data.tableState) setTableState(data.tableState);
           if (data.players) setPlayers(data.players);
-          setHoleCards(null);
+          // Don't clear hole cards on showdown - show them
+          // setHoleCards(null);
         }
       );
 
@@ -283,7 +302,7 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
     (action: ActionRequest) => {
       socketRef.current?.emit(ClientEvents.PLAYER_ACTION, {
         gameId,
-        ...action,
+        action,
       });
     },
     [gameId]
@@ -302,6 +321,7 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
     gameResults,
     error,
     connected,
+    serverLegalActions,
     takeSeat,
     leaveSeat,
     startGame,

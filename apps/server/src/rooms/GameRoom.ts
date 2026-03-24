@@ -13,7 +13,7 @@ import type {
   Settlement,
 } from '@poker/shared';
 import { ServerEvents } from '@poker/shared';
-import { GameState, toPublicTableState, toPrivatePlayerState, calculateSettlements } from '@poker/game-engine';
+import { GameState, toPublicTableState, toPublicPlayerStates, toPrivatePlayerState, calculateSettlements } from '@poker/game-engine';
 import {
   saveSeatTaken,
   saveSeatLeft,
@@ -22,7 +22,9 @@ import {
   saveGameResults,
   updateGameStatus,
   getDisplayName,
+  fetchSeatedPlayers,
   type HandRecordData,
+  type SeatedPlayer,
 } from '../services/gameService.js';
 
 export class GameRoom {
@@ -60,6 +62,46 @@ export class GameRoom {
     this.gameState = new GameState(gameId, config);
   }
 
+  /** Whether we've hydrated seats from DB yet */
+  private hydrated = false;
+
+  /**
+   * Load current seated players from the database into the GameState.
+   * Called once when the room is first created.
+   */
+  async hydrateFromDB(): Promise<void> {
+    if (this.hydrated) return;
+    this.hydrated = true;
+
+    const seatedPlayers = await fetchSeatedPlayers(
+      this.gameId,
+      this.config.buyInConfig.chipValue,
+    );
+
+    console.log(`[GameRoom ${this.gameId}] Hydrating ${seatedPlayers.length} players:`,
+      JSON.stringify(seatedPlayers.map(p => ({ seat: p.seatNumber, name: p.displayName, chips: p.chips, cashBuyIn: p.cashBuyIn }))));
+
+    for (const sp of seatedPlayers) {
+      try {
+        this.gameState.seats.seatPlayer(
+          sp.seatNumber,
+          sp.userId,
+          sp.chips,
+          sp.displayName,
+        );
+        this.totalBuyIns.set(sp.userId, sp.cashBuyIn);
+        console.log(
+          `[GameRoom ${this.gameId}] Hydrated seat ${sp.seatNumber}: ${sp.displayName} (${sp.chips} chips)`,
+        );
+      } catch (err) {
+        console.error(
+          `[GameRoom ${this.gameId}] Failed to hydrate seat ${sp.seatNumber}:`,
+          err,
+        );
+      }
+    }
+  }
+
   // ---- Connection Management ----
 
   join(socket: Socket, userId: string): void {
@@ -68,8 +110,9 @@ export class GameRoom {
     console.log(`[GameRoom ${this.gameId}] ${userId} joined room`);
 
     // Send current table state to the joining player
-    const publicState = toPublicTableState(this.gameState);
-    socket.emit(ServerEvents.GAME_STATE, publicState);
+    const tableState = toPublicTableState(this.gameState);
+    const players = toPublicPlayerStates(this.gameState);
+    socket.emit(ServerEvents.GAME_STATE, { tableState, players });
 
     // If they have hole cards (reconnecting mid-hand), send them
     this.sendPrivateCards(userId);
@@ -254,13 +297,15 @@ export class GameRoom {
     );
 
     // Broadcast hand started to the room
-    const publicState = toPublicTableState(this.gameState);
+    const tableState = toPublicTableState(this.gameState);
+    const playersState = toPublicPlayerStates(this.gameState);
     this.io.to(this.roomName).emit(ServerEvents.HAND_STARTED, {
       handNumber: this.gameState.handNumber,
       dealerSeat: this.gameState.dealerSeat,
       smallBlindSeat: this.gameState.sbSeat,
       bigBlindSeat: this.gameState.bbSeat,
-      state: publicState,
+      tableState,
+      players: playersState,
     });
 
     // Send private hole cards to each player
@@ -274,7 +319,9 @@ export class GameRoom {
 
   handleAction(userId: string, action: ActionRequest): void {
     if (!this.gameState.handInProgress) {
-      throw new Error('No hand in progress');
+      const socket = this.sockets.get(userId);
+      if (socket) socket.emit(ServerEvents.ERROR, { message: 'No hand in progress' });
+      return;
     }
 
     // Validate it's this player's turn
@@ -308,16 +355,19 @@ export class GameRoom {
       `[GameRoom ${this.gameId}] ${userId} -> ${action.type}${action.amount ? ` ${action.amount}` : ''}`,
     );
 
-    // Broadcast the action to the room
+    // Broadcast the action + updated state to the room
+    const tableState = toPublicTableState(this.gameState);
+    const playersState = toPublicPlayerStates(this.gameState);
     this.io.to(this.roomName).emit(ServerEvents.ACTION_PERFORMED, {
-      userId,
-      seatNumber: currentPlayer.seatNumber,
-      action: action.type,
-      amount: action.amount ?? 0,
+      tableState,
+      players: playersState,
+      action: {
+        userId,
+        displayName: this.gameState.seats.getPlayer(currentPlayer.seatNumber)?.displayName ?? userId.slice(0, 8),
+        type: action.type,
+        amount: action.amount ?? 0,
+      },
     });
-
-    // Broadcast updated table state
-    this.broadcastTableState();
 
     // Check if the hand is complete
     if (this.gameState.isHandComplete()) {
@@ -329,8 +379,15 @@ export class GameRoom {
   }
 
   private resolveHand(): void {
-    // Resolve the hand
-    const handResult = this.gameState.resolveHand();
+    let handResult: HandResult;
+    try {
+      handResult = this.gameState.resolveHand();
+    } catch (err) {
+      console.error(`[GameRoom ${this.gameId}] resolveHand CRASHED:`, err);
+      // Force end the hand gracefully
+      this.broadcastTableState();
+      return;
+    }
 
     console.log(
       `[GameRoom ${this.gameId}] Hand #${this.gameState.handNumber} resolved`,
@@ -452,8 +509,12 @@ export class GameRoom {
   // ---- Broadcasting ----
 
   broadcastTableState(): void {
-    const publicState = toPublicTableState(this.gameState);
-    this.io.to(this.roomName).emit(ServerEvents.GAME_STATE, publicState);
+    const tableState = toPublicTableState(this.gameState);
+    const players = toPublicPlayerStates(this.gameState);
+    this.io.to(this.roomName).emit(ServerEvents.GAME_STATE, {
+      tableState,
+      players,
+    });
   }
 
   sendPrivateCards(userId: string): void {
@@ -481,9 +542,13 @@ export class GameRoom {
       }
     }
 
+    const tableState = toPublicTableState(this.gameState);
+    const playersState = toPublicPlayerStates(this.gameState);
     this.io.to(this.roomName).emit(ServerEvents.HAND_RESULT, {
       ...result,
       showdownCards,
+      tableState,
+      players: playersState,
     });
   }
 

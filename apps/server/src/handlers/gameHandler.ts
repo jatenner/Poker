@@ -49,6 +49,9 @@ async function getOrCreateRoom(
   rooms.set(gameId, room);
   console.log(`[gameHandler] Created room for game ${gameId}`);
 
+  // Hydrate seated players from DB (they were seated via the lobby page)
+  await room.hydrateFromDB();
+
   return room;
 }
 

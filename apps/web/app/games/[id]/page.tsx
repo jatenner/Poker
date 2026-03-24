@@ -457,23 +457,8 @@ export default function GameLobbyPage() {
 
   const handleStartGame = async () => {
     if (!user || !game) return;
-    setActionLoading(true);
-
-    const { error: startError } = await supabase
-      .from("games")
-      .update({
-        status: "active",
-        started_at: new Date().toISOString(),
-      })
-      .eq("id", gameId)
-      .eq("creator_user_id", user.id)
-      .eq("status", "lobby");
-
-    if (startError) {
-      setError(startError.message);
-    } else {
-      router.replace(`/games/${gameId}/play`);
-    }
+    // Just redirect to the play page — the socket server handles starting
+    router.push(`/games/${gameId}/play?start=1`);
 
     setActionLoading(false);
   };

@@ -221,6 +221,59 @@ export async function saveGameResults(
   }
 }
 
+// ---- Hydrate Seats from DB ----
+
+export interface SeatedPlayer {
+  seatNumber: number;
+  userId: string;
+  displayName: string;
+  chips: number;
+  cashBuyIn: number;
+}
+
+export async function fetchSeatedPlayers(
+  gameId: string,
+  chipValue: number,
+): Promise<SeatedPlayer[]> {
+  // Get occupied seats with profile info
+  const { data: seatRows, error: seatErr } = await supabase()
+    .from('game_seats')
+    .select('seat_number, user_id, profiles!game_seats_user_id_fkey(display_name)')
+    .eq('game_id', gameId)
+    .eq('status', 'occupied');
+
+  if (seatErr || !seatRows) return [];
+
+  // Get buy-ins per user
+  const { data: buyInRows } = await supabase()
+    .from('buy_ins')
+    .select('user_id, cash_amount, chips_amount')
+    .eq('game_id', gameId);
+
+  const buyInMap = new Map<string, { cash: number; chips: number }>();
+  for (const b of buyInRows ?? []) {
+    const prev = buyInMap.get(b.user_id) ?? { cash: 0, chips: 0 };
+    buyInMap.set(b.user_id, {
+      cash: prev.cash + Number(b.cash_amount),
+      chips: prev.chips + b.chips_amount,
+    });
+  }
+
+  return seatRows
+    .filter((s: any) => s.user_id)
+    .map((s: any) => {
+      const profile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
+      const bi = buyInMap.get(s.user_id) ?? { cash: 0, chips: 0 };
+      return {
+        seatNumber: s.seat_number,
+        userId: s.user_id,
+        displayName: profile?.display_name ?? s.user_id.slice(0, 8),
+        chips: bi.chips > 0 ? bi.chips : Math.floor(bi.cash / chipValue),
+        cashBuyIn: bi.cash,
+      };
+    });
+}
+
 // ---- Profile Lookup ----
 
 export async function getDisplayName(userId: string): Promise<string> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import type { PlayerAction } from "@poker/shared";
 
 interface ActionPanelProps {
@@ -39,25 +39,40 @@ export default function ActionPanel({
 
   const [betAmount, setBetAmount] = useState(minBet);
 
+  // Reset bet amount when minBet changes
+  useEffect(() => {
+    setBetAmount(minBet);
+  }, [minBet]);
+
   // Quick bet presets
   const presets = useMemo(() => {
     const list: { label: string; value: number }[] = [];
+    if (minBet <= maxBet) {
+      list.push({ label: "Min", value: minBet });
+    }
     const halfPot = Math.max(Math.floor(pot * 0.5), minBet);
     const threeFourPot = Math.max(Math.floor(pot * 0.75), minBet);
     const fullPot = Math.max(pot, minBet);
+    const twoPot = Math.max(pot * 2, minBet);
 
-    if (halfPot <= maxBet) list.push({ label: "1/2", value: halfPot });
-    if (threeFourPot <= maxBet && threeFourPot !== halfPot)
-      list.push({ label: "3/4", value: threeFourPot });
-    if (fullPot <= maxBet && fullPot !== threeFourPot)
+    if (halfPot <= maxBet && halfPot > minBet)
+      list.push({ label: "1/2 Pot", value: halfPot });
+    if (threeFourPot <= maxBet && threeFourPot !== halfPot && threeFourPot > minBet)
+      list.push({ label: "3/4 Pot", value: threeFourPot });
+    if (fullPot <= maxBet && fullPot !== threeFourPot && fullPot > minBet)
       list.push({ label: "Pot", value: fullPot });
+    if (twoPot <= maxBet && twoPot > fullPot)
+      list.push({ label: "2x Pot", value: twoPot });
 
     return list;
   }, [pot, minBet, maxBet]);
 
-  const handleBetChange = useCallback((value: number) => {
-    setBetAmount(Math.max(sliderMin, Math.min(sliderMax, value)));
-  }, [sliderMin, sliderMax]);
+  const handleBetChange = useCallback(
+    (value: number) => {
+      setBetAmount(Math.max(sliderMin, Math.min(sliderMax, value)));
+    },
+    [sliderMin, sliderMax]
+  );
 
   const handleBetSubmit = useCallback(() => {
     if (betAmount >= maxBet) {
@@ -69,62 +84,90 @@ export default function ActionPanel({
     }
   }, [betAmount, maxBet, canRaise, onAction]);
 
-  // Timer bar (cosmetic)
-  const timerWidth = 75; // percentage, cosmetic for now
-
   return (
     <div className="fixed inset-x-0 bottom-0 z-50">
-      {/* Timer bar */}
-      <div className="h-1 bg-black/40">
-        <div
-          className="h-full bg-gradient-to-r from-chip-gold to-chip-red transition-all duration-1000"
-          style={{ width: `${timerWidth}%` }}
-        />
-      </div>
+      {/* Glowing top edge to draw attention */}
+      <div className="h-px bg-gradient-to-r from-transparent via-chip-gold/60 to-transparent" />
 
-      <div className="border-t border-white/10 bg-bg-surface/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-3">
+      <div className="border-t border-white/10 bg-[#111111]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-4 sm:px-6">
+          {/* YOUR TURN indicator */}
+          <div className="flex items-center justify-center gap-2">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-chip-gold shadow-[0_0_8px] shadow-chip-gold/50" />
+            <span className="text-sm font-bold uppercase tracking-widest text-chip-gold">
+              Your Turn
+            </span>
+            <div className="h-2 w-2 animate-pulse rounded-full bg-chip-gold shadow-[0_0_8px] shadow-chip-gold/50" />
+          </div>
+
           {/* Bet slider row */}
           {showSlider && (
-            <div className="flex items-center gap-3">
-              {/* Quick presets */}
-              <div className="flex gap-1.5">
+            <div className="flex flex-col gap-2">
+              {/* Presets */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
                 {presets.map((p) => (
                   <button
                     key={p.label}
                     onClick={() => handleBetChange(p.value)}
-                    className="rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/80 transition hover:bg-white/20"
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                      betAmount === p.value
+                        ? "bg-chip-gold/25 text-chip-gold ring-1 ring-chip-gold/40"
+                        : "bg-white/8 text-white/70 hover:bg-white/15 hover:text-white"
+                    }`}
                   >
                     {p.label}
                   </button>
                 ))}
                 <button
                   onClick={() => handleBetChange(maxBet)}
-                  className="rounded-md bg-chip-red/20 px-2.5 py-1 text-[11px] font-semibold text-chip-red transition hover:bg-chip-red/30"
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                    betAmount >= maxBet
+                      ? "bg-chip-red/25 text-chip-red ring-1 ring-chip-red/40"
+                      : "bg-chip-red/10 text-chip-red/80 hover:bg-chip-red/20 hover:text-chip-red"
+                  }`}
                 >
                   All-In
                 </button>
               </div>
 
-              {/* Slider */}
-              <input
-                type="range"
-                min={sliderMin}
-                max={sliderMax}
-                value={betAmount}
-                onChange={(e) => handleBetChange(Number(e.target.value))}
-                className="h-2 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-chip-gold"
-              />
+              {/* Slider + Input */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => handleBetChange(betAmount - (minBet || 1))}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/8 text-lg font-bold text-white/60 transition hover:bg-white/15 hover:text-white"
+                >
+                  -
+                </button>
 
-              {/* Amount input */}
-              <input
-                type="number"
-                min={sliderMin}
-                max={sliderMax}
-                value={betAmount}
-                onChange={(e) => handleBetChange(Number(e.target.value))}
-                className="w-20 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-center text-sm font-bold text-white outline-none focus:border-chip-gold"
-              />
+                <div className="relative flex-1">
+                  <input
+                    type="range"
+                    min={sliderMin}
+                    max={sliderMax}
+                    step={Math.max(1, Math.floor((sliderMax - sliderMin) / 100))}
+                    value={betAmount}
+                    onChange={(e) => handleBetChange(Number(e.target.value))}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-chip-gold"
+                  />
+                </div>
+
+                <button
+                  onClick={() => handleBetChange(betAmount + (minBet || 1))}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/8 text-lg font-bold text-white/60 transition hover:bg-white/15 hover:text-white"
+                >
+                  +
+                </button>
+
+                {/* Amount display */}
+                <input
+                  type="number"
+                  min={sliderMin}
+                  max={sliderMax}
+                  value={betAmount}
+                  onChange={(e) => handleBetChange(Number(e.target.value))}
+                  className="w-24 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-center text-sm font-bold text-white outline-none transition focus:border-chip-gold focus:ring-1 focus:ring-chip-gold/30"
+                />
+              </div>
             </div>
           )}
 
@@ -134,7 +177,7 @@ export default function ActionPanel({
             {canFold && (
               <button
                 onClick={() => onAction("fold")}
-                className="flex-1 rounded-lg bg-chip-red/90 px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-chip-red active:scale-[0.97]"
+                className="flex-1 rounded-xl bg-gradient-to-b from-red-600 to-red-800 px-5 py-3 text-sm font-black uppercase tracking-wide text-white shadow-lg transition-all hover:from-red-500 hover:to-red-700 active:scale-[0.97]"
               >
                 Fold
               </button>
@@ -144,7 +187,7 @@ export default function ActionPanel({
             {canCheck && (
               <button
                 onClick={() => onAction("check")}
-                className="flex-1 rounded-lg bg-chip-blue/90 px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-chip-blue active:scale-[0.97]"
+                className="flex-1 rounded-xl bg-gradient-to-b from-blue-600 to-blue-800 px-5 py-3 text-sm font-black uppercase tracking-wide text-white shadow-lg transition-all hover:from-blue-500 hover:to-blue-700 active:scale-[0.97]"
               >
                 Check
               </button>
@@ -154,7 +197,7 @@ export default function ActionPanel({
             {canCall && (
               <button
                 onClick={() => onAction("call", currentBet)}
-                className="flex-1 rounded-lg bg-felt-500 px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-felt-400 active:scale-[0.97]"
+                className="flex-1 rounded-xl bg-gradient-to-b from-felt-500 to-felt-700 px-5 py-3 text-sm font-black uppercase tracking-wide text-white shadow-lg transition-all hover:from-felt-400 hover:to-felt-600 active:scale-[0.97]"
               >
                 Call {formatChips(currentBet)}
               </button>
@@ -164,21 +207,21 @@ export default function ActionPanel({
             {showSlider && (
               <button
                 onClick={handleBetSubmit}
-                className="flex-1 rounded-lg bg-chip-gold px-4 py-2.5 text-sm font-black text-black shadow-md transition hover:brightness-110 active:scale-[0.97]"
+                className="flex-1 rounded-xl bg-gradient-to-b from-yellow-500 to-yellow-700 px-5 py-3 text-sm font-black uppercase tracking-wide text-black shadow-lg transition-all hover:from-yellow-400 hover:to-yellow-600 active:scale-[0.97]"
               >
                 {betAmount >= maxBet
-                  ? "All-In"
+                  ? `All-In ${formatChips(maxBet)}`
                   : canRaise
                     ? `Raise ${formatChips(betAmount)}`
                     : `Bet ${formatChips(betAmount)}`}
               </button>
             )}
 
-            {/* All-in (if no slider but all-in is legal) */}
+            {/* All-in (standalone when no slider) */}
             {canAllIn && !showSlider && (
               <button
                 onClick={() => onAction("all-in", maxBet)}
-                className="flex-1 rounded-lg bg-chip-red px-4 py-2.5 text-sm font-black text-white shadow-md transition hover:brightness-110 active:scale-[0.97]"
+                className="flex-1 rounded-xl bg-gradient-to-b from-red-500 to-red-700 px-5 py-3 text-sm font-black uppercase tracking-wide text-white shadow-lg transition-all hover:from-red-400 hover:to-red-600 active:scale-[0.97]"
               >
                 All-In {formatChips(maxBet)}
               </button>
