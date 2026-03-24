@@ -29,7 +29,9 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/games");
+    // Use replace + refresh to ensure auth state propagates
+    router.replace("/games");
+    router.refresh();
   };
 
   return (

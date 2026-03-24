@@ -62,17 +62,17 @@ interface SeatData {
 
 const SEAT_POSITIONS: { top: string; left: string }[] = [
   // Top row: seats 0, 1, 2
-  { top: "2%", left: "18%" },
-  { top: "0%", left: "44%" },
-  { top: "2%", left: "70%" },
+  { top: "-2%", left: "18%" },
+  { top: "-6%", left: "50%" },
+  { top: "-2%", left: "82%" },
   // Right: seat 3
-  { top: "42%", left: "90%" },
+  { top: "45%", left: "100%" },
   // Bottom row: seats 4, 5, 6
-  { top: "80%", left: "70%" },
-  { top: "82%", left: "44%" },
-  { top: "80%", left: "18%" },
+  { top: "90%", left: "82%" },
+  { top: "95%", left: "50%" },
+  { top: "90%", left: "18%" },
   // Left: seat 7
-  { top: "42%", left: "-2%" },
+  { top: "45%", left: "0%" },
 ];
 
 /* ------------------------------------------------------------------ */
