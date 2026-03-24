@@ -225,14 +225,16 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
         ServerEvents.HAND_RESULT,
         (data: any) => {
           if (cancelled) return;
-          // Server sends { winners, potResults, showdownCards, ... }
-          // OR { result: { winners, potResults }, ... }
-          const result: HandResult = data.result ?? { winners: data.winners ?? [], potResults: data.potResults ?? [] };
+          console.log("[useGameSocket] HAND_RESULT received:", JSON.stringify(data).slice(0, 500));
+          // Server sends { winners, potResults, showdownCards, tableState, players }
+          const result: HandResult = data.result ?? {
+            winners: data.winners ?? [],
+            potResults: data.potResults ?? [],
+          };
+          console.log("[useGameSocket] Parsed winners:", result.winners?.length);
           setHandResult(result);
           if (data.tableState) setTableState(data.tableState);
           if (data.players) setPlayers(data.players);
-          // Don't clear hole cards on showdown - show them
-          // setHoleCards(null);
         }
       );
 

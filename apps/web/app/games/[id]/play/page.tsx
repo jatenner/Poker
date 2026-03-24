@@ -80,20 +80,33 @@ export default function PlayPage() {
     [playerAction]
   );
 
-  // Auto-dismiss hand result after 4 seconds
+  // Hand result display — show for 6 seconds then dismiss
   const handResultRef = useRef(handResult);
   handResultRef.current = handResult;
   const [showHandResult, setShowHandResult] = useState(false);
+  const [betweenHands, setBetweenHands] = useState(false);
 
   useEffect(() => {
     if (handResult && handResult.winners && handResult.winners.length > 0) {
+      console.log("[PlayPage] Showing hand result:", handResult.winners.length, "winners");
       setShowHandResult(true);
-      const timer = setTimeout(() => setShowHandResult(false), 4000);
-      return () => clearTimeout(timer);
+      setBetweenHands(false);
+      const hideTimer = setTimeout(() => {
+        setShowHandResult(false);
+        setBetweenHands(true);
+      }, 6000);
+      return () => clearTimeout(hideTimer);
     } else {
       setShowHandResult(false);
     }
   }, [handResult]);
+
+  // Clear "between hands" when a new hand starts
+  useEffect(() => {
+    if (tableState?.handNumber) {
+      setBetweenHands(false);
+    }
+  }, [tableState?.handNumber]);
 
   // --- Loading / auth states ---
 
@@ -396,6 +409,20 @@ export default function PlayPage() {
               >
                 Back to Lobby
               </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Between hands indicator */}
+      {betweenHands && !showHandResult && (
+        <div className="absolute inset-x-0 top-20 z-[50] flex justify-center pointer-events-none animate-[fadeIn_0.3s_ease-out]">
+          <div className="rounded-2xl border border-felt-500/30 bg-[#111]/90 px-8 py-4 backdrop-blur-md shadow-xl">
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-felt-400 border-t-transparent" />
+              <span className="text-base font-bold text-felt-300">
+                Dealing next hand...
+              </span>
             </div>
           </div>
         </div>
