@@ -90,15 +90,7 @@ export default function ActionPanel({
       <div className="h-px bg-gradient-to-r from-transparent via-chip-gold/60 to-transparent" />
 
       <div className="border-t border-white/10 bg-[#111111]/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-4 sm:px-6">
-          {/* YOUR TURN indicator */}
-          <div className="flex items-center justify-center gap-2">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-chip-gold shadow-[0_0_8px] shadow-chip-gold/50" />
-            <span className="text-sm font-bold uppercase tracking-widest text-chip-gold">
-              Your Turn
-            </span>
-            <div className="h-2 w-2 animate-pulse rounded-full bg-chip-gold shadow-[0_0_8px] shadow-chip-gold/50" />
-          </div>
+        <div className="mx-auto flex max-w-3xl flex-col gap-2 px-3 py-2.5 sm:px-5">
 
           {/* Bet slider row */}
           {showSlider && (
