@@ -413,23 +413,43 @@ export class GameRoom {
     let handResult: HandResult;
     try {
       handResult = this.gameState.resolveHand();
+      console.log(
+        `[GameRoom ${this.gameId}] Hand #${this.gameState.handNumber} resolved: ${handResult.winners.length} winner(s), pot distributed`,
+      );
+      for (const w of handResult.winners) {
+        const p = this.gameState.seats.getPlayer(this.gameState.seats.getSeatByUserId(w.userId));
+        console.log(
+          `  Winner: ${p?.displayName ?? w.userId} +${w.amount} chips (${w.hand ?? 'fold win'})`,
+        );
+      }
     } catch (err) {
       console.error(`[GameRoom ${this.gameId}] resolveHand CRASHED:`, err);
-      // Force end the hand gracefully — still schedule next hand
-      this.broadcastTableState();
-      if (this.status === 'active') {
-        this.nextHandTimer = setTimeout(() => {
-          try { this.startNewHand(); } catch (e) {
-            console.error(`[GameRoom ${this.gameId}] Failed to start next hand after crash:`, e);
-          }
-        }, 5000);
-      }
-      return;
-    }
 
-    console.log(
-      `[GameRoom ${this.gameId}] Hand #${this.gameState.handNumber} resolved`,
-    );
+      // Build a fallback result — give pot to last active player
+      const activePlayers = this.gameState.seats.getActivePlayers();
+      const totalPot = this.gameState.potManager?.getTotal() ?? 0;
+      if (activePlayers.length > 0) {
+        const winner = activePlayers[0];
+        winner.player.stack += totalPot;
+        handResult = {
+          winners: [{
+            userId: winner.player.userId,
+            seatNumber: winner.seatNumber,
+            amount: totalPot,
+            hand: undefined,
+          }],
+          potResults: [{ potIndex: 0, amount: totalPot, winners: [{
+            userId: winner.player.userId,
+            seatNumber: winner.seatNumber,
+            amount: totalPot,
+          }] }],
+        };
+        console.log(`  Fallback winner: ${winner.player.displayName} +${totalPot} chips`);
+      } else {
+        // Absolute fallback
+        handResult = { winners: [], potResults: [] };
+      }
+    }
 
     // Broadcast hand result
     this.broadcastHandResult(handResult);

@@ -263,91 +263,111 @@ export default function PlayPage() {
         </div>
       )}
 
-      {/* Hand result overlay — table stays visible behind */}
-      {showHandResult && handResult && handResult.winners && handResult.winners.length > 0 && (
-        <div className="absolute inset-0 z-[55] flex items-center justify-center pointer-events-none animate-[fadeIn_0.2s_ease-out]">
-          {/* CSS Confetti particles */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {Array.from({ length: 24 }).map((_, i) => (
-              <div
-                key={i}
-                className="absolute animate-confetti"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `-5%`,
-                  width: `${6 + Math.random() * 6}px`,
-                  height: `${6 + Math.random() * 6}px`,
-                  backgroundColor: [
-                    "#f9a825", "#e53935", "#1e88e5", "#43a047", "#ab47bc", "#ff7043",
-                  ][i % 6],
-                  borderRadius: Math.random() > 0.5 ? "50%" : "2px",
-                  animationDelay: `${Math.random() * 2}s`,
-                  animationDuration: `${2.5 + Math.random() * 2}s`,
-                }}
-              />
-            ))}
-          </div>
+      {/* ===== WINNER CELEBRATION OVERLAY ===== */}
+      {showHandResult && handResult && handResult.winners && handResult.winners.length > 0 && (() => {
+        const mainWinner = handResult.winners[0];
+        const winnerPlayer = players.find((p) => p.userId === mainWinner.userId);
+        const isYou = mainWinner.userId === currentUserId;
+        const winnerName = isYou ? "You" : (winnerPlayer?.displayName ?? "Player");
 
-          <div className="pointer-events-auto mx-4 w-full max-w-md">
-            {/* Main winner card */}
-            {(() => {
-              const mainWinner = handResult.winners[0];
-              const winnerPlayer = players.find((p) => p.userId === mainWinner.userId);
-              const isYou = mainWinner.userId === currentUserId;
-              return (
-                <div className="flex flex-col items-center gap-3">
-                  {/* Big avatar with glow */}
+        return (
+          <div className="absolute inset-0 z-[55] flex items-center justify-center pointer-events-none">
+            {/* Dark overlay */}
+            <div className="absolute inset-0 bg-black/40 animate-[fadeIn_0.3s_ease-out]" />
+
+            {/* Confetti */}
+            <div className="absolute inset-0 overflow-hidden">
+              {Array.from({ length: 30 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute animate-confetti"
+                  style={{
+                    left: `${5 + Math.random() * 90}%`,
+                    top: "-5%",
+                    width: `${6 + Math.random() * 8}px`,
+                    height: `${6 + Math.random() * 8}px`,
+                    backgroundColor: ["#f9a825", "#e53935", "#1e88e5", "#43a047", "#ab47bc", "#ff7043", "#ffffff"][i % 7],
+                    borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+                    animationDelay: `${Math.random() * 1.5}s`,
+                    animationDuration: `${2 + Math.random() * 2}s`,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Winner card */}
+            <div className="pointer-events-auto relative animate-scale-pop">
+              <div className="flex flex-col items-center gap-4">
+                {/* Pulsing rings behind avatar */}
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full animate-winner-ring bg-chip-gold/30" style={{ width: 120, height: 120, margin: "auto", top: 0, left: 0, right: 0, bottom: 0 }} />
+                  <div className="absolute inset-0 rounded-full animate-winner-ring bg-chip-gold/20" style={{ width: 120, height: 120, margin: "auto", top: 0, left: 0, right: 0, bottom: 0, animationDelay: "0.5s" }} />
+
+                  {/* Avatar with gold ring */}
                   <div className="relative">
-                    <div className="absolute inset-0 rounded-full bg-chip-gold/20 blur-xl scale-150" />
-                    <div className="relative rounded-full border-4 border-chip-gold shadow-[0_0_30px_rgba(249,168,37,0.4)]">
+                    <div className="absolute -inset-3 rounded-full bg-chip-gold/25 blur-xl" />
+                    <div className="relative overflow-hidden rounded-full border-4 border-chip-gold shadow-[0_0_40px_rgba(249,168,37,0.5)]" style={{ width: 100, height: 100 }}>
                       <AvatarDisplay
                         avatarUrl={winnerPlayer?.avatarUrl}
-                        displayName={winnerPlayer?.displayName ?? "Winner"}
+                        displayName={winnerName}
                         size="xl"
                       />
                     </div>
-                    <div className="absolute -top-2 -right-2 text-3xl animate-bounce">🏆</div>
-                  </div>
-
-                  {/* Winner name + chips */}
-                  <div className="rounded-2xl border border-chip-gold/30 bg-[#151515]/95 backdrop-blur-md px-8 py-4 text-center shadow-2xl">
-                    <div className="text-lg font-black text-white mb-1">
-                      {isYou ? "You Win!" : `${winnerPlayer?.displayName ?? "Player"} Wins!`}
-                    </div>
-                    {mainWinner.hand && (
-                      <div className="text-sm text-chip-gold/90 font-semibold mb-2">
-                        {mainWinner.hand}
-                      </div>
-                    )}
-                    <div className="text-2xl font-black text-chip-gold">
-                      +{formatChips(mainWinner.amount)} chips
-                    </div>
-
-                    {/* Additional winners (split pot) */}
-                    {handResult.winners.length > 1 && (
-                      <div className="mt-3 pt-3 border-t border-white/10 space-y-1">
-                        {handResult.winners.slice(1).map((w, i) => {
-                          const p = players.find((pl) => pl.userId === w.userId);
-                          return (
-                            <div key={i} className="flex items-center justify-between text-sm">
-                              <span className="text-white/70">{p?.displayName ?? "Player"}</span>
-                              <span className="text-chip-gold font-bold">+{formatChips(w.amount)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    <div className="mt-3 text-[11px] text-white/30 font-medium">
-                      Next hand dealing...
-                    </div>
+                    {/* Trophy */}
+                    <div className="absolute -top-3 -right-3 text-4xl animate-bounce drop-shadow-lg">🏆</div>
+                    {/* Stars */}
+                    <div className="absolute -top-1 -left-3 text-2xl animate-pulse">⭐</div>
+                    <div className="absolute -bottom-2 -right-1 text-xl animate-pulse" style={{ animationDelay: "0.3s" }}>✨</div>
                   </div>
                 </div>
-              );
-            })()}
+
+                {/* Info card */}
+                <div className="animate-slide-up rounded-2xl border border-chip-gold/40 bg-[#111]/95 backdrop-blur-lg px-10 py-5 text-center shadow-[0_0_60px_rgba(249,168,37,0.15)]">
+                  {/* Winner name */}
+                  <div className="text-2xl font-black text-white mb-1">
+                    {isYou ? "🎉 You Win! 🎉" : `${winnerName} Wins!`}
+                  </div>
+
+                  {/* Winning hand */}
+                  {mainWinner.hand && (
+                    <div className="inline-block rounded-full bg-chip-gold/15 px-4 py-1 text-sm font-bold text-chip-gold mb-3">
+                      🃏 {mainWinner.hand}
+                    </div>
+                  )}
+
+                  {/* Chips won */}
+                  <div className="text-3xl font-black text-chip-gold mt-1">
+                    💰 +{formatChips(mainWinner.amount)}
+                  </div>
+                  <div className="text-xs text-white/40 mt-1">chips won</div>
+
+                  {/* Split pot */}
+                  {handResult.winners.length > 1 && (
+                    <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
+                      <div className="text-xs font-bold text-white/50 uppercase">Split Pot</div>
+                      {handResult.winners.slice(1).map((w, i) => {
+                        const p = players.find((pl) => pl.userId === w.userId);
+                        return (
+                          <div key={i} className="flex items-center justify-between text-sm px-2">
+                            <span className="text-white/70">{w.userId === currentUserId ? "You" : (p?.displayName ?? "Player")}</span>
+                            <span className="text-chip-gold font-black">+{formatChips(w.amount)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Next hand */}
+                  <div className="mt-4 flex items-center justify-center gap-2">
+                    <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-felt-400" />
+                    <span className="text-xs text-white/30 font-medium">Next hand dealing...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Game ended overlay */}
       {gameResults && (
