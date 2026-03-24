@@ -180,7 +180,7 @@ export default function AvatarBuilder({
       onConfigChange({
         ...config,
         eyes: combo.eyes,
-        eyebrow: combo.eyebrow,
+        eyebrows: combo.eyebrows,
         mouth: combo.mouth,
       });
     },
@@ -189,7 +189,7 @@ export default function AvatarBuilder({
 
   const isVibeActive = (combo: (typeof VIBE_COMBOS)[number]) =>
     config.eyes === combo.eyes &&
-    config.eyebrow === combo.eyebrow &&
+    config.eyebrows === combo.eyebrows &&
     config.mouth === combo.mouth;
 
   const isPresetActive = (preset: (typeof PRESETS)[number]) => {
@@ -223,9 +223,9 @@ export default function AvatarBuilder({
         <div>
           <SectionLabel>Eyebrows</SectionLabel>
           <OptionGrid
-            options={AVATAR_OPTIONS.eyebrow}
-            selectedValue={config.eyebrow}
-            onChange={(v) => updateField("eyebrow", v)}
+            options={AVATAR_OPTIONS.eyebrows}
+            selectedValue={config.eyebrows}
+            onChange={(v) => updateField("eyebrows", v)}
           />
         </div>
         <div>
@@ -269,19 +269,29 @@ export default function AvatarBuilder({
         <div>
           <SectionLabel>Clothing</SectionLabel>
           <OptionGrid
-            options={AVATAR_OPTIONS.clothe}
-            selectedValue={config.clothe}
-            onChange={(v) => updateField("clothe", v)}
+            options={AVATAR_OPTIONS.clothing}
+            selectedValue={config.clothing}
+            onChange={(v) => updateField("clothing", v)}
           />
         </div>
         <div>
-          <SectionLabel>Color</SectionLabel>
+          <SectionLabel>Clothes Color</SectionLabel>
           <ColorRow
-            options={AVATAR_OPTIONS.clotheColor}
-            selectedValue={config.clotheColor}
-            onChange={(v) => updateField("clotheColor", v)}
+            options={AVATAR_OPTIONS.clothesColor}
+            selectedValue={config.clothesColor}
+            onChange={(v) => updateField("clothesColor", v)}
           />
         </div>
+        {config.clothing === "graphicShirt" && (
+          <div>
+            <SectionLabel>Graphic</SectionLabel>
+            <OptionGrid
+              options={AVATAR_OPTIONS.clothingGraphic}
+              selectedValue={config.clothingGraphic}
+              onChange={(v) => updateField("clothingGraphic", v)}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -305,11 +315,11 @@ export default function AvatarBuilder({
             onChange={(v) => updateField("facialHair", v)}
           />
         </div>
-        {config.facialHair && config.facialHair !== "none" && (
+        {config.facialHair && config.facialHair !== "" && (
           <div>
             <SectionLabel>Facial Hair Color</SectionLabel>
             <ColorRow
-              options={AVATAR_OPTIONS.hairColor}
+              options={AVATAR_OPTIONS.facialHairColor}
               selectedValue={config.facialHairColor ?? config.hairColor}
               onChange={(v) => updateField("facialHairColor", v)}
             />
