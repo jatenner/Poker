@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { PlayerAction } from "@poker/shared";
 import PokerTable from "@/components/table/PokerTable";
+import AvatarDisplay from "@/components/AvatarDisplay";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useGameSocket } from "@/hooks/useGameSocket";
 
@@ -43,6 +44,12 @@ export default function PlayPage() {
   } = useGameSocket(gameId);
 
   const currentUserId = user?.id ?? "";
+
+  // Track if we've ever seen active state — never go back to lobby screen
+  const hasBeenActive = useRef(false);
+  if (tableState && tableState.status === "active") {
+    hasBeenActive.current = true;
+  }
 
   // Auto-start game if creator arrived with ?start=1
   const startedRef = useRef(false);
@@ -165,8 +172,8 @@ export default function PlayPage() {
     );
   }
 
-  // ===== LOBBY STATE =====
-  if (tableState.status === "lobby") {
+  // ===== LOBBY STATE (only show if we've never been active) =====
+  if (tableState.status === "lobby" && !hasBeenActive.current) {
     return (
       <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-8 bg-[#0a0a0a]">
         {/* Background glow */}
@@ -243,60 +250,66 @@ export default function PlayPage() {
         </div>
       )}
 
-      {/* Hand result overlay */}
-      {showHandResult && handResult && handResult.winners && (
-        <div className="absolute inset-0 z-[55] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="mx-4 w-full max-w-sm rounded-2xl border border-chip-gold/30 bg-[#151515] p-6 shadow-[0_0_40px_rgba(249,168,37,0.15)]">
-            {/* Winner banner */}
-            <div className="mb-4 text-center">
-              <div className="text-3xl mb-2">🏆</div>
-              <h2 className="text-xl font-black text-chip-gold">
-                {handResult.winners.length === 1 ? "Winner!" : "Split Pot!"}
-              </h2>
-            </div>
-
-            {/* Winners list */}
-            <div className="space-y-3 mb-4">
-              {handResult.winners.map((w, i) => {
-                const winnerPlayer = players.find((p) => p.userId === w.userId);
-                const isYou = w.userId === currentUserId;
-                return (
-                  <div
-                    key={i}
-                    className={`flex items-center justify-between rounded-xl px-4 py-3 ${
-                      isYou ? "bg-felt-900/40 border border-felt-500/30" : "bg-white/5"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white ${
-                        isYou ? "bg-felt-600" : "bg-chip-blue"
-                      }`}>
-                        {(winnerPlayer?.displayName ?? "?")[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-white">
-                          {isYou ? "You" : winnerPlayer?.displayName ?? `Seat ${w.seatNumber}`}
-                        </div>
-                        {w.hand && (
-                          <div className="text-xs text-chip-gold/80">{w.hand}</div>
-                        )}
-                      </div>
+      {/* Hand result overlay — table stays visible behind */}
+      {showHandResult && handResult && handResult.winners && handResult.winners.length > 0 && (
+        <div className="absolute inset-0 z-[55] flex items-center justify-center pointer-events-none animate-[fadeIn_0.2s_ease-out]">
+          <div className="pointer-events-auto mx-4 w-full max-w-md">
+            {/* Main winner card */}
+            {(() => {
+              const mainWinner = handResult.winners[0];
+              const winnerPlayer = players.find((p) => p.userId === mainWinner.userId);
+              const isYou = mainWinner.userId === currentUserId;
+              return (
+                <div className="flex flex-col items-center gap-3">
+                  {/* Big avatar with glow */}
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-full bg-chip-gold/20 blur-xl scale-150" />
+                    <div className="relative rounded-full border-4 border-chip-gold shadow-[0_0_30px_rgba(249,168,37,0.4)]">
+                      <AvatarDisplay
+                        avatarUrl={winnerPlayer?.avatarUrl}
+                        displayName={winnerPlayer?.displayName ?? "Winner"}
+                        size="xl"
+                      />
                     </div>
-                    <div className="text-right">
-                      <div className="text-lg font-black text-chip-gold">
-                        +{formatChips(w.amount)}
+                    <div className="absolute -top-2 -right-2 text-3xl animate-bounce">🏆</div>
+                  </div>
+
+                  {/* Winner name + chips */}
+                  <div className="rounded-2xl border border-chip-gold/30 bg-[#151515]/95 backdrop-blur-md px-8 py-4 text-center shadow-2xl">
+                    <div className="text-lg font-black text-white mb-1">
+                      {isYou ? "You Win!" : `${winnerPlayer?.displayName ?? "Player"} Wins!`}
+                    </div>
+                    {mainWinner.hand && (
+                      <div className="text-sm text-chip-gold/90 font-semibold mb-2">
+                        {mainWinner.hand}
                       </div>
-                      <div className="text-[10px] text-white/40">chips</div>
+                    )}
+                    <div className="text-2xl font-black text-chip-gold">
+                      +{formatChips(mainWinner.amount)} chips
+                    </div>
+
+                    {/* Additional winners (split pot) */}
+                    {handResult.winners.length > 1 && (
+                      <div className="mt-3 pt-3 border-t border-white/10 space-y-1">
+                        {handResult.winners.slice(1).map((w, i) => {
+                          const p = players.find((pl) => pl.userId === w.userId);
+                          return (
+                            <div key={i} className="flex items-center justify-between text-sm">
+                              <span className="text-white/70">{p?.displayName ?? "Player"}</span>
+                              <span className="text-chip-gold font-bold">+{formatChips(w.amount)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="mt-3 text-[11px] text-white/30 font-medium">
+                      Next hand dealing...
                     </div>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Next hand notice */}
-            <div className="text-center text-xs text-white/30 mt-3">
-              Next hand starting shortly...
-            </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
