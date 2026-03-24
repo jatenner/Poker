@@ -5,7 +5,7 @@ import { useState } from "react";
 interface AvatarDisplayProps {
   avatarUrl: string | null | undefined;
   displayName: string | null | undefined;
-  size?: "sm" | "md" | "lg" | "xl" | "xxl";
+  size?: "sm" | "md" | "lg" | "xl" | "xxl" | "seat";
   className?: string;
 }
 
@@ -13,6 +13,7 @@ const SIZE_MAP = {
   sm: { px: 32, text: "text-xs" },
   md: { px: 48, text: "text-sm" },
   lg: { px: 64, text: "text-base" },
+  seat: { px: 72, text: "text-lg" },
   xl: { px: 96, text: "text-xl" },
   xxl: { px: 128, text: "text-2xl" },
 } as const;

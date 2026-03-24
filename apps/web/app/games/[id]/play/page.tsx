@@ -253,6 +253,28 @@ export default function PlayPage() {
       {/* Hand result overlay — table stays visible behind */}
       {showHandResult && handResult && handResult.winners && handResult.winners.length > 0 && (
         <div className="absolute inset-0 z-[55] flex items-center justify-center pointer-events-none animate-[fadeIn_0.2s_ease-out]">
+          {/* CSS Confetti particles */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {Array.from({ length: 24 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute animate-confetti"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `-5%`,
+                  width: `${6 + Math.random() * 6}px`,
+                  height: `${6 + Math.random() * 6}px`,
+                  backgroundColor: [
+                    "#f9a825", "#e53935", "#1e88e5", "#43a047", "#ab47bc", "#ff7043",
+                  ][i % 6],
+                  borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+                  animationDelay: `${Math.random() * 2}s`,
+                  animationDuration: `${2.5 + Math.random() * 2}s`,
+                }}
+              />
+            ))}
+          </div>
+
           <div className="pointer-events-auto mx-4 w-full max-w-md">
             {/* Main winner card */}
             {(() => {

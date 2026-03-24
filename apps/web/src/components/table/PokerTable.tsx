@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type {
   PublicTableState,
   PublicPlayerState,
@@ -58,6 +59,26 @@ const SEAT_POSITIONS: { top: string; left: string; isBottom: boolean }[] = [
   { top: "85%", left: "22%", isBottom: true },
 ];
 
+/** Dealer avatar icon in the center of the table */
+function DealerAvatar({ isDealing }: { isDealing: boolean }) {
+  return (
+    <div className="flex flex-col items-center">
+      <div className={`relative ${isDealing ? "animate-pulse" : ""}`}>
+        {/* Subtle glow behind dealer */}
+        <div className="absolute -inset-1.5 rounded-full bg-yellow-500/15 blur-md" />
+        {/* 48px circle with gradient */}
+        <div
+          className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#2a2a2a] to-[#d4a843] shadow-lg ring-2 ring-yellow-600/30"
+        >
+          <span className="text-lg font-serif font-bold italic text-yellow-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+            D
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PokerTable({
   tableState,
   players,
@@ -69,6 +90,19 @@ export default function PokerTable({
 }: PokerTableProps) {
   const currentPlayer = players.find((p) => p.userId === currentUserId);
   const isMyTurn = currentPlayer?.isTurn ?? false;
+
+  // Track street changes for dealer dealing animation
+  const [prevStreet, setPrevStreet] = useState(tableState.street);
+  const [isDealing, setIsDealing] = useState(false);
+
+  useEffect(() => {
+    if (tableState.street !== prevStreet) {
+      setPrevStreet(tableState.street);
+      setIsDealing(true);
+      const timer = setTimeout(() => setIsDealing(false), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [tableState.street, prevStreet]);
 
   // Build a seat-number -> player map
   const seatMap = new Map<number, PublicPlayerState>();
@@ -106,9 +140,13 @@ export default function PokerTable({
         {/* Center: Pot */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 rounded-full bg-black/40 px-4 py-1.5 ring-1 ring-white/10">
-            <div className="h-3.5 w-3.5 rounded-full bg-gradient-to-br from-chip-gold to-yellow-700 shadow-sm" />
-            <span className="text-sm font-black text-chip-gold">
-              {formatChips(tableState.pot)}
+            {/* Chip stack icon in top bar */}
+            <div className="relative h-4 w-3.5 flex-shrink-0">
+              <div className="absolute bottom-0 left-0 h-3 w-3 rounded-full bg-gradient-to-br from-chip-red to-red-800 ring-1 ring-black/20" />
+              <div className="absolute bottom-0.5 left-0.5 h-3 w-3 rounded-full bg-gradient-to-br from-chip-gold to-yellow-700 ring-1 ring-black/20" />
+            </div>
+            <span className="text-base font-black text-chip-gold">
+              ${formatChips(tableState.pot)}
             </span>
             {tableState.pots.length > 1 && (
               <span className="ml-1 text-xs text-white/30">
@@ -155,6 +193,9 @@ export default function PokerTable({
 
             {/* Center content */}
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+              {/* Dealer avatar - above community cards */}
+              <DealerAvatar isDealing={isDealing} />
+
               {/* Community cards */}
               <CommunityCards
                 cards={tableState.communityCards}
@@ -163,10 +204,15 @@ export default function PokerTable({
 
               {/* Pot display on felt */}
               {tableState.pot > 0 && (
-                <div className="mt-1 flex items-center gap-2 rounded-full bg-black/35 px-4 py-1.5 shadow-lg backdrop-blur-sm">
-                  <div className="h-4 w-4 rounded-full bg-gradient-to-br from-chip-gold to-yellow-700 shadow-sm ring-1 ring-black/20" />
-                  <span className="text-base font-black text-chip-gold drop-shadow">
-                    {formatChips(tableState.pot)}
+                <div className="mt-1 flex items-center gap-2.5 rounded-full bg-black/40 px-5 py-2 shadow-lg backdrop-blur-sm">
+                  {/* Chip stack visual: 3 overlapping colored circles */}
+                  <div className="relative h-6 w-5 flex-shrink-0">
+                    <div className="absolute bottom-0 left-0 h-5 w-5 rounded-full bg-gradient-to-br from-chip-red to-red-800 ring-1 ring-black/30" />
+                    <div className="absolute bottom-1 left-0 h-5 w-5 rounded-full bg-gradient-to-br from-chip-blue to-blue-800 ring-1 ring-black/30" />
+                    <div className="absolute bottom-2 left-0 h-5 w-5 rounded-full bg-gradient-to-br from-chip-gold to-yellow-700 ring-1 ring-black/30" />
+                  </div>
+                  <span className="text-lg font-black text-chip-gold drop-shadow">
+                    ${formatChips(tableState.pot)}
                   </span>
                 </div>
               )}
