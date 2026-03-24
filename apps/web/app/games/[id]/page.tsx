@@ -358,6 +358,11 @@ export default function GameLobbyPage() {
       router.push("/login");
       return;
     }
+    // Prevent sitting in multiple seats
+    if (userSeat) {
+      setError("You're already seated at this table.");
+      return;
+    }
     setSelectedSeat(seatNumber);
     setBuyInModalOpen(true);
   };
@@ -516,15 +521,23 @@ export default function GameLobbyPage() {
 
       {/* Main area */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-6">
-        {/* Info strip */}
-        <div className="mb-4 flex flex-wrap items-center justify-center gap-4 text-sm">
-          <span className="font-bold text-[var(--color-text-primary)] text-lg">{game.title}</span>
-          <span className="text-[var(--color-text-secondary)]">
-            Blinds: <span className="text-[var(--color-text-primary)] font-medium">${game.small_blind}/{game.big_blind}</span>
-          </span>
-          <span className="text-[var(--color-text-secondary)]">
-            Buy-in: <span className="text-[var(--color-text-primary)] font-medium">${game.min_buy_in}&ndash;${game.max_buy_in}</span>
-          </span>
+        {/* Game info header — centered, clean, above table */}
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-black text-white tracking-tight">{game.title}</h1>
+          <div className="mt-2 flex items-center justify-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-white/40">Blinds</span>
+              <span className="rounded-full bg-white/8 px-3 py-0.5 font-bold text-white">
+                ${game.small_blind} / ${game.big_blind}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-white/40">Buy-in</span>
+              <span className="rounded-full bg-white/8 px-3 py-0.5 font-bold text-chip-gold">
+                ${game.min_buy_in}&ndash;${game.max_buy_in}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* ============ THE TABLE ============ */}

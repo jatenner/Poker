@@ -29,11 +29,18 @@ app.get('/health', (_req, res) => {
 });
 
 // --- Socket.IO ---
-const allowedOrigin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const allowedOrigins = [
+  process.env.NEXT_PUBLIC_APP_URL,
+  'http://localhost:3000',
+  'https://pokerweb-production.up.railway.app',
+].filter(Boolean) as string[];
+
+console.log(`[server] CORS allowed origins: ${allowedOrigins.join(', ')}`);
+console.log(`[server] PORT: ${PORT}`);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigin,
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   },
