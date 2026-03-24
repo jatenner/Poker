@@ -415,8 +415,15 @@ export class GameRoom {
       handResult = this.gameState.resolveHand();
     } catch (err) {
       console.error(`[GameRoom ${this.gameId}] resolveHand CRASHED:`, err);
-      // Force end the hand gracefully
+      // Force end the hand gracefully — still schedule next hand
       this.broadcastTableState();
+      if (this.status === 'active') {
+        this.nextHandTimer = setTimeout(() => {
+          try { this.startNewHand(); } catch (e) {
+            console.error(`[GameRoom ${this.gameId}] Failed to start next hand after crash:`, e);
+          }
+        }, 5000);
+      }
       return;
     }
 

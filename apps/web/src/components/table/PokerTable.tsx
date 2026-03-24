@@ -41,37 +41,48 @@ function formatChips(amount: number): string {
  * Current user (seat 5 or 6) is at the bottom center.
  */
 const SEAT_POSITIONS: { top: string; left: string; isBottom: boolean }[] = [
-  // Left side
-  { top: "42%", left: "1%", isBottom: false },
-  // Top-left
-  { top: "4%", left: "18%", isBottom: false },
+  // Left side — pushed further out
+  { top: "44%", left: "-4%", isBottom: false },
+  // Top-left — more spread
+  { top: "-2%", left: "14%", isBottom: false },
   // Top-center
-  { top: "0%", left: "50%", isBottom: false },
-  // Top-right
-  { top: "4%", left: "82%", isBottom: false },
-  // Right side
-  { top: "42%", left: "99%", isBottom: false },
-  // Bottom-right
-  { top: "85%", left: "78%", isBottom: true },
+  { top: "-6%", left: "50%", isBottom: false },
+  // Top-right — more spread
+  { top: "-2%", left: "86%", isBottom: false },
+  // Right side — pushed further out
+  { top: "44%", left: "104%", isBottom: false },
+  // Bottom-right — more spread
+  { top: "90%", left: "82%", isBottom: true },
   // Bottom-center
-  { top: "92%", left: "50%", isBottom: true },
-  // Bottom-left
-  { top: "85%", left: "22%", isBottom: true },
+  { top: "96%", left: "50%", isBottom: true },
+  // Bottom-left — more spread
+  { top: "90%", left: "18%", isBottom: true },
 ];
 
-/** Dealer avatar icon in the center of the table */
+/** Dealer character seated at the table */
 function DealerAvatar({ isDealing }: { isDealing: boolean }) {
+  // A fixed DiceBear dealer avatar — dark hair, bow tie, serious face
+  const dealerUrl = "https://api.dicebear.com/9.x/avataaars/svg?top=shortFlat&hairColor=2c1b18&clothing=blazerAndShirt&clothesColor=262626&eyes=default&eyebrows=default&mouth=serious&skinColor=edb98a&backgroundColor=transparent&accessories=prescription01";
+
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center gap-1">
       <div className={`relative ${isDealing ? "animate-pulse" : ""}`}>
-        {/* Subtle glow behind dealer */}
-        <div className="absolute -inset-1.5 rounded-full bg-yellow-500/15 blur-md" />
-        {/* 48px circle with gradient */}
-        <div
-          className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#2a2a2a] to-[#d4a843] shadow-lg ring-2 ring-yellow-600/30"
+        {/* Glow */}
+        <div className="absolute -inset-2 rounded-full bg-chip-gold/10 blur-lg" />
+        {/* Dealer avatar */}
+        <div className="relative overflow-hidden rounded-full border-2 border-chip-gold/40 shadow-lg"
+          style={{ width: "56px", height: "56px" }}
         >
-          <span className="text-lg font-serif font-bold italic text-yellow-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
-            D
+          <img
+            src={dealerUrl}
+            alt="Dealer"
+            className="h-full w-full object-cover"
+          />
+        </div>
+        {/* DEALER badge */}
+        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-chip-gold to-yellow-600 px-2 py-0.5 shadow-md">
+          <span className="text-[8px] font-black uppercase tracking-wider text-black">
+            Dealer
           </span>
         </div>
       </div>
@@ -170,7 +181,7 @@ export default function PokerTable({
       {/* ===== MAIN TABLE AREA ===== */}
       <div className="relative flex flex-1 items-center justify-center px-4 py-4">
         {/* Table container - responsive */}
-        <div className="relative aspect-[16/9] w-full max-w-[900px]">
+        <div className="relative aspect-[16/9] w-full max-w-[1000px]">
           {/* Outer rail - wood brown */}
           <div className="absolute inset-0 rounded-[50%] bg-gradient-to-b from-[#6d4c41] via-table-rail to-[#3e2723] shadow-[0_8px_32px_rgba(0,0,0,0.6)]" />
 
