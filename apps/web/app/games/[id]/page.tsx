@@ -76,21 +76,6 @@ const SEAT_POSITIONS: { top: string; left: string }[] = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Avatar colors by seat                                              */
-/* ------------------------------------------------------------------ */
-
-const AVATAR_COLORS = [
-  "bg-chip-red",
-  "bg-chip-blue",
-  "bg-chip-gold",
-  "bg-felt-500",
-  "bg-purple-600",
-  "bg-orange-600",
-  "bg-teal-600",
-  "bg-pink-600",
-];
-
-/* ------------------------------------------------------------------ */
 /*  Status Badge                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -130,14 +115,11 @@ function PokerSeat({
 }) {
   const isEmpty = seat.status === "open";
   const isSittingOut = seat.status === "sitting-out";
-  const initials = seat.displayName?.[0]?.toUpperCase() ?? "?";
-  const colorClass = AVATAR_COLORS[seat.seatNumber % AVATAR_COLORS.length];
-
   if (isEmpty) {
     return (
       <div className="flex flex-col items-center gap-1">
         <div
-          className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed transition
+          className={`flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed transition
             ${isLobby
               ? "border-white/15 bg-black/30 hover:border-felt-500/60 cursor-pointer group"
               : "border-white/10 bg-black/20"

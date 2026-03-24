@@ -39,7 +39,7 @@ export default function PlayerSeat({
   if (!player) {
     return (
       <div className="flex flex-col items-center gap-1">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-white/10 bg-white/[0.03]">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-white/10 bg-white/[0.03]">
           <span className="text-xs font-medium text-white/20">
             {seatNumber + 1}
           </span>

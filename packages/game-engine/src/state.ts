@@ -316,22 +316,44 @@ export class GameState {
       };
     }
 
+    // Make sure we have all 5 community cards for showdown
+    if (this.communityCards.length < 5) {
+      this.runOutBoard();
+    }
+
     // Evaluate hands
     const evaluations = new Map<string, HandEvaluation>();
     for (const { player } of activePlayers) {
       const hole = this.holeCards.get(player.userId);
       if (hole) {
         const allCards = [...hole, ...this.communityCards];
-        if (allCards.length >= 5) {
-          evaluations.set(player.userId, evaluateHand(allCards));
-        }
+        evaluations.set(player.userId, evaluateHand(allCards));
       }
+    }
+
+    // If no evaluations (shouldn't happen), split pot equally
+    if (evaluations.size === 0) {
+      const totalPot = this.potManager.getTotal();
+      const share = Math.floor(totalPot / activePlayers.length);
+      const winners: WinnerInfo[] = activePlayers.map(({ seatNumber, player }) => {
+        player.stack += share;
+        return { userId: player.userId, seatNumber, amount: share };
+      });
+      return { winners, potResults: [{ potIndex: 0, amount: totalPot, winners }] };
     }
 
     // Distribute pots
     const pots = this.potManager.getPots();
     const potResults: PotResult[] = [];
     const winnerTotals = new Map<string, number>();
+
+    // If no pots exist (edge case), create one from the total
+    if (pots.length === 0) {
+      const totalPot = this.potManager.getTotal();
+      if (totalPot > 0) {
+        pots.push({ amount: totalPot, eligiblePlayerIds: activePlayers.map(a => a.player.userId) });
+      }
+    }
 
     for (let i = 0; i < pots.length; i++) {
       const pot = pots[i];

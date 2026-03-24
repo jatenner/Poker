@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 interface AvatarDisplayProps {
   avatarUrl: string | null | undefined;
   displayName: string | null | undefined;
@@ -8,19 +10,11 @@ interface AvatarDisplayProps {
 }
 
 const SIZE_MAP = {
-  sm: { px: 32, text: "text-xs", emoji: "text-base" },
-  md: { px: 48, text: "text-sm", emoji: "text-xl" },
-  lg: { px: 56, text: "text-base", emoji: "text-2xl" },
-  xl: { px: 80, text: "text-xl", emoji: "text-4xl" },
+  sm: { px: 32, text: "text-xs" },
+  md: { px: 48, text: "text-sm" },
+  lg: { px: 64, text: "text-base" },
+  xl: { px: 96, text: "text-xl" },
 } as const;
-
-/** Parse `emoji:😎:bg-chip-red` format */
-function parseEmojiAvatar(url: string): { emoji: string; bg: string } | null {
-  if (!url.startsWith("emoji:")) return null;
-  const parts = url.split(":");
-  if (parts.length < 3) return null;
-  return { emoji: parts[1], bg: parts.slice(2).join(":") };
-}
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return "?";
@@ -32,6 +26,11 @@ function getInitials(name: string | null | undefined): string {
     .slice(0, 2);
 }
 
+function getDefaultDiceBearUrl(displayName: string | null | undefined): string {
+  const seed = encodeURIComponent(displayName?.trim() || "default");
+  return `https://api.dicebear.com/9.x/adventurer/svg?seed=${seed}`;
+}
+
 export default function AvatarDisplay({
   avatarUrl,
   displayName,
@@ -40,53 +39,35 @@ export default function AvatarDisplay({
 }: AvatarDisplayProps) {
   const s = SIZE_MAP[size];
   const dim = `${s.px}px`;
+  const [imgError, setImgError] = useState(false);
 
-  // Emoji avatar
-  if (avatarUrl && avatarUrl.startsWith("emoji:")) {
-    const parsed = parseEmojiAvatar(avatarUrl);
-    if (parsed) {
-      return (
-        <div
-          className={`flex items-center justify-center rounded-full ${parsed.bg} ${className}`}
-          style={{ width: dim, height: dim, minWidth: dim }}
-        >
-          <span className={s.emoji} role="img">
-            {parsed.emoji}
-          </span>
-        </div>
-      );
-    }
-  }
+  const baseClasses =
+    "rounded-full border border-white/15 shadow-[0_2px_8px_rgba(0,0,0,0.4)]";
 
-  // Initials with custom color: `initials:bg-chip-red`
-  if (avatarUrl && avatarUrl.startsWith("initials:")) {
-    const bgClass = avatarUrl.replace("initials:", "");
-    return (
-      <div
-        className={`flex items-center justify-center rounded-full ${bgClass} ${s.text} font-bold text-white ${className}`}
-        style={{ width: dim, height: dim, minWidth: dim }}
-      >
-        {getInitials(displayName)}
-      </div>
-    );
-  }
+  // Determine the image URL to use
+  const imageUrl = avatarUrl && !avatarUrl.startsWith("emoji:") && !avatarUrl.startsWith("initials:")
+    ? avatarUrl
+    : null;
 
-  // Image URL
-  if (avatarUrl && !avatarUrl.startsWith("emoji:")) {
+  const effectiveUrl = imageUrl || getDefaultDiceBearUrl(displayName);
+
+  // If image hasn't errored, render an <img>
+  if (!imgError) {
     return (
       <img
-        src={avatarUrl}
+        src={effectiveUrl}
         alt={displayName ?? "Avatar"}
-        className={`rounded-full object-cover ${className}`}
+        className={`${baseClasses} object-cover ${className}`}
         style={{ width: dim, height: dim, minWidth: dim }}
+        onError={() => setImgError(true)}
       />
     );
   }
 
-  // Initials fallback (no avatar set)
+  // Ultimate fallback: initials
   return (
     <div
-      className={`flex items-center justify-center rounded-full bg-gradient-to-br from-felt-500 to-felt-700 ${s.text} font-bold text-white ${className}`}
+      className={`flex items-center justify-center ${baseClasses} bg-gradient-to-br from-felt-500 to-felt-700 ${s.text} font-bold text-white ${className}`}
       style={{ width: dim, height: dim, minWidth: dim }}
     >
       {getInitials(displayName)}
@@ -94,4 +75,4 @@ export default function AvatarDisplay({
   );
 }
 
-export { parseEmojiAvatar, getInitials };
+export { getInitials, getDefaultDiceBearUrl };

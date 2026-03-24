@@ -36,12 +36,16 @@ export default function SignUpPage() {
     setLoading(true);
 
     const supabase = createBrowserClient();
-    const { error: signUpError } = await supabase.auth.signUp({
+    const trimmedName = displayName.trim();
+    const defaultAvatarUrl = `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(trimmedName)}`;
+
+    const { error: signUpError, data: signUpData } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          display_name: displayName.trim(),
+          display_name: trimmedName,
+          avatar_url: defaultAvatarUrl,
         },
       },
     });
@@ -50,6 +54,16 @@ export default function SignUpPage() {
       setError(signUpError.message);
       setLoading(false);
       return;
+    }
+
+    // Set the default avatar in the profiles table
+    if (signUpData.user) {
+      await supabase.from("profiles").upsert({
+        id: signUpData.user.id,
+        display_name: trimmedName,
+        avatar_url: defaultAvatarUrl,
+        updated_at: new Date().toISOString(),
+      });
     }
 
     router.push("/games");
