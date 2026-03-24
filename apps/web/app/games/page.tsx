@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import type { GameStatus } from "@poker/shared";
+import GamesTabs from "./GamesTabs";
 
 interface GameRow {
   id: string;
@@ -18,46 +19,32 @@ interface GameRow {
   seat_count: number;
 }
 
-function StatusBadge({ status }: { status: GameStatus }) {
-  const config: Record<string, { bg: string; text: string; label: string }> = {
-    lobby: {
-      bg: "bg-felt-700/40",
-      text: "text-felt-300",
-      label: "Lobby",
-    },
-    active: {
-      bg: "bg-chip-gold/20",
-      text: "text-chip-gold",
-      label: "Active",
-    },
-    completed: {
-      bg: "bg-white/5",
-      text: "text-[var(--color-text-secondary)]",
-      label: "Completed",
-    },
-    paused: {
-      bg: "bg-chip-blue/20",
-      text: "text-chip-blue",
-      label: "Paused",
-    },
-  };
-
-  const c = config[status] ?? config.completed;
-
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${c.bg} ${c.text}`}
-    >
-      {c.label}
-    </span>
-  );
+interface CompletedGameRow {
+  id: string;
+  title: string;
+  status: GameStatus;
+  max_seats: number;
+  small_blind: number;
+  big_blind: number;
+  created_at: string;
+  ended_at: string | null;
+  creator: {
+    display_name: string | null;
+  } | null;
+  player_count: number;
+  userNetResult: number | null;
 }
 
 export default async function GamesPage() {
   const supabase = await createServerClient();
 
-  // Fetch games that are in lobby or active state, with creator profile
-  const { data: games, error } = await supabase
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Fetch open games (lobby + active)
+  const { data: openGames, error: openError } = await supabase
     .from("games")
     .select(
       `
@@ -76,11 +63,10 @@ export default async function GamesPage() {
     .in("status", ["lobby", "active"])
     .order("created_at", { ascending: false });
 
-  // Fetch seat counts for each game
-  let gamesWithCounts: GameRow[] = [];
-
-  if (games && games.length > 0) {
-    const gameIds = games.map((g: { id: string }) => g.id);
+  // Fetch seat counts for open games
+  let openGamesWithCounts: GameRow[] = [];
+  if (openGames && openGames.length > 0) {
+    const gameIds = openGames.map((g: { id: string }) => g.id);
     const { data: seatCounts } = await supabase
       .from("game_seats")
       .select("game_id")
@@ -94,12 +80,109 @@ export default async function GamesPage() {
       }
     }
 
-    gamesWithCounts = games.map((g: Record<string, unknown>) => ({
+    openGamesWithCounts = openGames.map((g: Record<string, unknown>) => ({
       ...g,
       creator: Array.isArray(g.creator) ? g.creator[0] : g.creator,
       seat_count: countMap[g.id as string] || 0,
     })) as GameRow[];
   }
+
+  // Fetch completed games
+  const { data: completedGames } = await supabase
+    .from("games")
+    .select(
+      `
+      id,
+      title,
+      status,
+      max_seats,
+      small_blind,
+      big_blind,
+      created_at,
+      ended_at,
+      creator:profiles!games_creator_user_id_fkey(display_name)
+    `
+    )
+    .eq("status", "completed")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  // Get player counts + user's result for completed games
+  let completedGamesWithData: CompletedGameRow[] = [];
+  if (completedGames && completedGames.length > 0) {
+    const completedIds = completedGames.map((g: { id: string }) => g.id);
+
+    // Get results for all completed games
+    const { data: allResults } = await supabase
+      .from("game_results")
+      .select("game_id, user_id, net_result")
+      .in("game_id", completedIds);
+
+    const playerCountMap: Record<string, number> = {};
+    const userResultMap: Record<string, number> = {};
+    if (allResults) {
+      for (const r of allResults) {
+        playerCountMap[r.game_id] = (playerCountMap[r.game_id] || 0) + 1;
+        if (user && r.user_id === user.id) {
+          userResultMap[r.game_id] = r.net_result;
+        }
+      }
+    }
+
+    completedGamesWithData = completedGames.map(
+      (g: Record<string, unknown>) => ({
+        ...g,
+        creator: Array.isArray(g.creator) ? g.creator[0] : g.creator,
+        player_count: playerCountMap[g.id as string] || 0,
+        userNetResult: userResultMap[g.id as string] ?? null,
+      })
+    ) as CompletedGameRow[];
+  }
+
+  // Fetch "My Games" — games user participated in (has results or is seated)
+  let myGames: (GameRow | CompletedGameRow)[] = [];
+  if (user) {
+    // Games user has results in
+    const { data: myResults } = await supabase
+      .from("game_results")
+      .select("game_id, net_result")
+      .eq("user_id", user.id);
+
+    // Games user is currently seated in
+    const { data: mySeats } = await supabase
+      .from("game_seats")
+      .select("game_id")
+      .eq("user_id", user.id)
+      .in("status", ["occupied", "sitting-out"]);
+
+    const myGameIds = new Set<string>();
+    const myResultMap: Record<string, number> = {};
+    if (myResults) {
+      for (const r of myResults) {
+        myGameIds.add(r.game_id);
+        myResultMap[r.game_id] = r.net_result;
+      }
+    }
+    if (mySeats) {
+      for (const s of mySeats) {
+        myGameIds.add(s.game_id);
+      }
+    }
+
+    // Combine from open + completed
+    for (const g of openGamesWithCounts) {
+      if (myGameIds.has(g.id)) {
+        myGames.push(g);
+      }
+    }
+    for (const g of completedGamesWithData) {
+      if (myGameIds.has(g.id)) {
+        myGames.push(g);
+      }
+    }
+  }
+
+  const error = openError;
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-20 pb-12">
@@ -125,73 +208,13 @@ export default async function GamesPage() {
         </div>
       )}
 
-      {/* Empty state */}
-      {!error && gamesWithCounts.length === 0 && (
-        <div className="card-surface py-16 text-center">
-          <p className="text-lg font-medium text-[var(--color-text-secondary)]">
-            No games available
-          </p>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            Be the first to create a game!
-          </p>
-          <Link href="/games/create" className="btn-primary mt-6 inline-flex">
-            Create Game
-          </Link>
-        </div>
-      )}
-
-      {/* Games grid */}
-      {gamesWithCounts.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {gamesWithCounts.map((game) => (
-            <Link
-              key={game.id}
-              href={`/games/${game.id}`}
-              className="card-surface transition hover:border-felt-600"
-            >
-              <div className="mb-3 flex items-start justify-between">
-                <h3 className="font-semibold text-[var(--color-text-primary)]">
-                  {game.title}
-                </h3>
-                <StatusBadge status={game.status} />
-              </div>
-
-              <p className="mb-3 text-xs text-[var(--color-text-secondary)]">
-                Created by{" "}
-                <span className="text-[var(--color-text-primary)]">
-                  {game.creator?.display_name ?? "Unknown"}
-                </span>
-              </p>
-
-              <div className="grid grid-cols-2 gap-y-2 text-sm">
-                <div>
-                  <span className="text-[var(--color-text-secondary)]">
-                    Seats
-                  </span>
-                  <p className="font-medium text-[var(--color-text-primary)]">
-                    {game.seat_count} / {game.max_seats}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[var(--color-text-secondary)]">
-                    Blinds
-                  </span>
-                  <p className="font-medium text-[var(--color-text-primary)]">
-                    ${game.small_blind} / ${game.big_blind}
-                  </p>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-[var(--color-text-secondary)]">
-                    Buy-in
-                  </span>
-                  <p className="font-medium text-[var(--color-text-primary)]">
-                    ${game.min_buy_in} &ndash; ${game.max_buy_in}
-                  </p>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+      {!error && (
+        <GamesTabs
+          openGames={openGamesWithCounts}
+          myGames={myGames}
+          completedGames={completedGamesWithData}
+          isLoggedIn={!!user}
+        />
       )}
     </div>
   );

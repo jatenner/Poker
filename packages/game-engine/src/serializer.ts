@@ -19,7 +19,10 @@ export function toPublicTableState(gameState: GameState): PublicTableState {
 /**
  * Create public player state for all players at the table.
  */
-export function toPublicPlayerStates(gameState: GameState): PublicPlayerState[] {
+export function toPublicPlayerStates(
+  gameState: GameState,
+  avatarUrls?: Map<string, string>,
+): PublicPlayerState[] {
   const players: PublicPlayerState[] = [];
 
   for (let i = 0; i < gameState.config.maxSeats; i++) {
@@ -30,6 +33,7 @@ export function toPublicPlayerStates(gameState: GameState): PublicPlayerState[] 
       userId: player.userId,
       seatNumber: i,
       displayName: player.displayName,
+      avatarUrl: avatarUrls?.get(player.userId),
       stack: player.stack,
       isFolded: player.isFolded,
       isAllIn: player.isAllIn,

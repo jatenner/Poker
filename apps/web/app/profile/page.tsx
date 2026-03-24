@@ -222,7 +222,7 @@ export default function ProfilePage() {
                 <div className="absolute -inset-3 rounded-full bg-felt-400/20 blur-xl" />
                 <div className="relative overflow-hidden rounded-full border-[3px] border-felt-400/50 shadow-xl">
                   <div
-                    className="rounded-full overflow-hidden"
+                    className="rounded-full overflow-hidden bg-gradient-to-br from-felt-500 to-felt-700"
                     style={{ width: "120px", height: "120px" }}
                   >
                     {previewUrl ? (
@@ -232,7 +232,7 @@ export default function ProfilePage() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-felt-500 to-felt-700 text-3xl font-bold text-white">
+                      <div className="flex h-full w-full items-center justify-center text-3xl font-bold text-white">
                         {displayName?.[0]?.toUpperCase() ?? "?"}
                       </div>
                     )}

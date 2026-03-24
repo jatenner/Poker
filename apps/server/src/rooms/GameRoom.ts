@@ -44,6 +44,10 @@ export class GameRoom {
   private preHandStacks: Map<string, number> = new Map();
   /** Auto-start next hand timer */
   private nextHandTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Avatar URLs per userId */
+  private avatarUrls: Map<string, string> = new Map();
+  /** Results for players who departed mid-game */
+  private departedResults: Map<string, GameResult> = new Map();
 
   private io: Server;
   private roomName: string;
@@ -90,6 +94,9 @@ export class GameRoom {
           sp.displayName,
         );
         this.totalBuyIns.set(sp.userId, sp.cashBuyIn);
+        if (sp.avatarUrl) {
+          this.avatarUrls.set(sp.userId, sp.avatarUrl);
+        }
         console.log(
           `[GameRoom ${this.gameId}] Hydrated seat ${sp.seatNumber}: ${sp.displayName} (${sp.chips} chips)`,
         );
@@ -111,7 +118,7 @@ export class GameRoom {
 
     // Send current table state to the joining player
     const tableState = toPublicTableState(this.gameState);
-    const players = toPublicPlayerStates(this.gameState);
+    const players = toPublicPlayerStates(this.gameState, this.avatarUrls);
     socket.emit(ServerEvents.GAME_STATE, { tableState, players });
 
     // If they have hole cards (reconnecting mid-hand), send them
@@ -213,6 +220,30 @@ export class GameRoom {
       throw new Error('Cannot leave seat during an active hand');
     }
 
+    // If the game is active, record a departed result before removing
+    if (this.status === 'active') {
+      const player = this.gameState.seats.getPlayer(seatNumber);
+      if (player) {
+        const chipValue = this.config.buyInConfig.chipValue;
+        const totalBuyIn = this.totalBuyIns.get(userId) ?? 0;
+        const cashoutValue = player.stack * chipValue;
+        const netResult = cashoutValue - totalBuyIn;
+
+        this.departedResults.set(userId, {
+          userId,
+          displayName: player.displayName,
+          totalBuyIn,
+          finalChips: player.stack,
+          cashoutValue,
+          netResult,
+        });
+
+        console.log(
+          `[GameRoom ${this.gameId}] Recorded departed result for ${userId}: net=${netResult}`,
+        );
+      }
+    }
+
     // Remove from game state
     this.gameState.seats.unseatPlayer(seatNumber);
 
@@ -298,7 +329,7 @@ export class GameRoom {
 
     // Broadcast hand started to the room
     const tableState = toPublicTableState(this.gameState);
-    const playersState = toPublicPlayerStates(this.gameState);
+    const playersState = toPublicPlayerStates(this.gameState, this.avatarUrls);
     this.io.to(this.roomName).emit(ServerEvents.HAND_STARTED, {
       handNumber: this.gameState.handNumber,
       dealerSeat: this.gameState.dealerSeat,
@@ -357,7 +388,7 @@ export class GameRoom {
 
     // Broadcast the action + updated state to the room
     const tableState = toPublicTableState(this.gameState);
-    const playersState = toPublicPlayerStates(this.gameState);
+    const playersState = toPublicPlayerStates(this.gameState, this.avatarUrls);
     this.io.to(this.roomName).emit(ServerEvents.ACTION_PERFORMED, {
       tableState,
       players: playersState,
@@ -488,7 +519,16 @@ export class GameRoom {
     const occupiedSeats = this.gameState.seats.getOccupiedSeats();
     const chipValue = this.config.buyInConfig.chipValue;
 
+    // Include departed players first
+    for (const [, result] of this.departedResults) {
+      results.push(result);
+    }
+
+    // Include currently seated players
     for (const { player } of occupiedSeats) {
+      // Skip if already recorded as departed (shouldn't happen, but be safe)
+      if (this.departedResults.has(player.userId)) continue;
+
       const totalBuyIn = this.totalBuyIns.get(player.userId) ?? 0;
       const cashoutValue = player.stack * chipValue;
       const netResult = cashoutValue - totalBuyIn;
@@ -510,7 +550,7 @@ export class GameRoom {
 
   broadcastTableState(): void {
     const tableState = toPublicTableState(this.gameState);
-    const players = toPublicPlayerStates(this.gameState);
+    const players = toPublicPlayerStates(this.gameState, this.avatarUrls);
     this.io.to(this.roomName).emit(ServerEvents.GAME_STATE, {
       tableState,
       players,
@@ -543,7 +583,7 @@ export class GameRoom {
     }
 
     const tableState = toPublicTableState(this.gameState);
-    const playersState = toPublicPlayerStates(this.gameState);
+    const playersState = toPublicPlayerStates(this.gameState, this.avatarUrls);
     this.io.to(this.roomName).emit(ServerEvents.HAND_RESULT, {
       ...result,
       showdownCards,
