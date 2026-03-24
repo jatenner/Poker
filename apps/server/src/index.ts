@@ -6,9 +6,10 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Load environment variables from the repo-root .env.local
+// Load environment variables — try repo-root .env.local (dev), fallback to process.env (prod/Railway)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') });
+dotenv.config(); // also load .env if present
 
 import express from 'express';
 import { createServer } from 'node:http';

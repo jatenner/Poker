@@ -476,6 +476,8 @@ export class GameState {
       dealerSeat: this.dealerSeat,
       currentTurn: this.currentTurnSeat >= 0 ? this.currentTurnSeat : undefined,
       minBet: this.betting.currentBet > 0 ? this.betting.currentBet : this.config.bigBlind,
+      smallBlind: this.config.smallBlind,
+      bigBlind: this.config.bigBlind,
       handNumber: this.handNumber,
     };
   }

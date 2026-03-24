@@ -11,6 +11,8 @@ interface PlayerSeatProps {
   seatNumber: number;
   /** Whether this seat position is at the bottom of the table (for card placement) */
   isBottom?: boolean;
+  /** Delay in ms for card dealing animation */
+  dealDelay?: number;
 }
 
 function formatChips(amount: number): string {
@@ -34,6 +36,7 @@ export default function PlayerSeat({
   holeCards,
   seatNumber,
   isBottom = false,
+  dealDelay,
 }: PlayerSeatProps) {
   // Empty seat - person silhouette
   if (!player) {
@@ -93,7 +96,7 @@ export default function PlayerSeat({
               <div className="absolute bottom-2 left-0 h-4 w-4 rounded-full bg-gradient-to-br from-chip-gold to-yellow-700 ring-1 ring-black/30" />
             </div>
             <span className="text-sm font-bold text-chip-gold">
-              {formatChips(player.currentBet)}
+              ${formatChips(player.currentBet)}
             </span>
           </div>
         </div>
@@ -102,8 +105,18 @@ export default function PlayerSeat({
       {/* Hole cards - shown above avatar for current user, below for others */}
       {isCurrentUser && showFaceUp && (
         <div className="mb-1 flex gap-1">
-          <PlayingCard card={holeCards![0]} size={cardSize} />
-          <PlayingCard card={holeCards![1]} size={cardSize} />
+          <div
+            className={dealDelay !== undefined ? "animate-deal-card" : ""}
+            style={dealDelay !== undefined ? { animationDelay: `${dealDelay}ms` } : undefined}
+          >
+            <PlayingCard card={holeCards![0]} size={cardSize} />
+          </div>
+          <div
+            className={dealDelay !== undefined ? "animate-deal-card" : ""}
+            style={dealDelay !== undefined ? { animationDelay: `${dealDelay + 1200}ms` } : undefined}
+          >
+            <PlayingCard card={holeCards![1]} size={cardSize} />
+          </div>
         </div>
       )}
 
@@ -131,6 +144,7 @@ export default function PlayerSeat({
         >
           <AvatarDisplay
             avatarUrl={player.avatarUrl}
+            avatarData={player.avatarData}
             displayName={player.displayName}
             size="seat"
           />
@@ -186,14 +200,24 @@ export default function PlayerSeat({
       {/* Stack */}
       <div className="flex items-center gap-1 text-sm font-bold text-felt-300">
         <span>🪙</span>
-        {formatChips(player.stack)}
+        ${formatChips(player.stack)}
       </div>
 
       {/* Face-down cards for other players */}
       {!isCurrentUser && showFaceDown && (
         <div className="mt-1 flex gap-0.5">
-          <PlayingCard card={null} faceDown size="xs" />
-          <PlayingCard card={null} faceDown size="xs" />
+          <div
+            className={dealDelay !== undefined ? "animate-deal-card" : ""}
+            style={dealDelay !== undefined ? { animationDelay: `${dealDelay}ms` } : undefined}
+          >
+            <PlayingCard card={null} faceDown size="xs" />
+          </div>
+          <div
+            className={dealDelay !== undefined ? "animate-deal-card" : ""}
+            style={dealDelay !== undefined ? { animationDelay: `${dealDelay + 1200}ms` } : undefined}
+          >
+            <PlayingCard card={null} faceDown size="xs" />
+          </div>
         </div>
       )}
 
@@ -203,7 +227,7 @@ export default function PlayerSeat({
           {ACTION_LABELS[player.lastAction] ?? player.lastAction}
           {(player.lastAction === "bet" || player.lastAction === "raise") &&
           player.currentBet > 0
-            ? ` ${formatChips(player.currentBet)}`
+            ? ` $${formatChips(player.currentBet)}`
             : ""}
         </div>
       )}

@@ -11,6 +11,7 @@ import type {
   ActionRequest,
   PublicTableState,
   Settlement,
+  AvatarData,
 } from '@poker/shared';
 import { ServerEvents } from '@poker/shared';
 import { GameState, toPublicTableState, toPublicPlayerStates, toPrivatePlayerState, calculateSettlements } from '@poker/game-engine';
@@ -46,6 +47,8 @@ export class GameRoom {
   private nextHandTimer: ReturnType<typeof setTimeout> | null = null;
   /** Avatar URLs per userId */
   private avatarUrls: Map<string, string> = new Map();
+  /** Avatar data (caricature) per userId */
+  private avatarDataMap: Map<string, AvatarData> = new Map();
   /** Results for players who departed mid-game */
   private departedResults: Map<string, GameResult> = new Map();
 
@@ -97,6 +100,9 @@ export class GameRoom {
         if (sp.avatarUrl) {
           this.avatarUrls.set(sp.userId, sp.avatarUrl);
         }
+        if (sp.avatarData) {
+          this.avatarDataMap.set(sp.userId, sp.avatarData as unknown as AvatarData);
+        }
         console.log(
           `[GameRoom ${this.gameId}] Hydrated seat ${sp.seatNumber}: ${sp.displayName} (${sp.chips} chips)`,
         );
@@ -118,7 +124,7 @@ export class GameRoom {
 
     // Send current table state to the joining player
     const tableState = toPublicTableState(this.gameState);
-    const players = toPublicPlayerStates(this.gameState, this.avatarUrls);
+    const players = toPublicPlayerStates(this.gameState, this.avatarUrls, this.avatarDataMap);
     socket.emit(ServerEvents.GAME_STATE, { tableState, players });
 
     // If they have hole cards (reconnecting mid-hand), send them
@@ -329,7 +335,7 @@ export class GameRoom {
 
     // Broadcast hand started to the room
     const tableState = toPublicTableState(this.gameState);
-    const playersState = toPublicPlayerStates(this.gameState, this.avatarUrls);
+    const playersState = toPublicPlayerStates(this.gameState, this.avatarUrls, this.avatarDataMap);
     this.io.to(this.roomName).emit(ServerEvents.HAND_STARTED, {
       handNumber: this.gameState.handNumber,
       dealerSeat: this.gameState.dealerSeat,
@@ -388,7 +394,7 @@ export class GameRoom {
 
     // Broadcast the action + updated state to the room
     const tableState = toPublicTableState(this.gameState);
-    const playersState = toPublicPlayerStates(this.gameState, this.avatarUrls);
+    const playersState = toPublicPlayerStates(this.gameState, this.avatarUrls, this.avatarDataMap);
     this.io.to(this.roomName).emit(ServerEvents.ACTION_PERFORMED, {
       tableState,
       players: playersState,
@@ -577,7 +583,7 @@ export class GameRoom {
 
   broadcastTableState(): void {
     const tableState = toPublicTableState(this.gameState);
-    const players = toPublicPlayerStates(this.gameState, this.avatarUrls);
+    const players = toPublicPlayerStates(this.gameState, this.avatarUrls, this.avatarDataMap);
     this.io.to(this.roomName).emit(ServerEvents.GAME_STATE, {
       tableState,
       players,
@@ -610,7 +616,7 @@ export class GameRoom {
     }
 
     const tableState = toPublicTableState(this.gameState);
-    const playersState = toPublicPlayerStates(this.gameState, this.avatarUrls);
+    const playersState = toPublicPlayerStates(this.gameState, this.avatarUrls, this.avatarDataMap);
     this.io.to(this.roomName).emit(ServerEvents.HAND_RESULT, {
       ...result,
       showdownCards,
@@ -631,11 +637,18 @@ export class GameRoom {
       player.stack,
     );
 
-    // Notify the room whose turn it is
+    const tableState = toPublicTableState(this.gameState);
+    const players = toPublicPlayerStates(this.gameState, this.avatarUrls, this.avatarDataMap);
+
+    console.log(`[GameRoom ${this.gameId}] ACTION_REQUIRED for ${currentPlayer.userId} seat ${currentPlayer.seatNumber}, actions: ${legalActions.map(a => a.action).join(',')}`);
+
+    // Notify the room whose turn it is (include full state for reliability)
     this.io.to(this.roomName).emit(ServerEvents.ACTION_REQUIRED, {
       userId: currentPlayer.userId,
       seatNumber: currentPlayer.seatNumber,
       legalActions,
+      tableState,
+      players,
     });
   }
 

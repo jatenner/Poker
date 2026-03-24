@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import type { AvatarData } from "@poker/shared";
+import CaricatureAvatar from "./CaricatureAvatar";
 
 interface AvatarDisplayProps {
   avatarUrl: string | null | undefined;
+  avatarData?: AvatarData | null;
   displayName: string | null | undefined;
   size?: "sm" | "md" | "lg" | "xl" | "xxl" | "seat";
   className?: string;
@@ -35,6 +38,7 @@ function getDefaultDiceBearUrl(displayName: string | null | undefined): string {
 
 export default function AvatarDisplay({
   avatarUrl,
+  avatarData,
   displayName,
   size = "md",
   className = "",
@@ -46,14 +50,26 @@ export default function AvatarDisplay({
   const baseClasses =
     "rounded-full border border-white/15 shadow-[0_2px_8px_rgba(0,0,0,0.4)]";
 
-  // Determine the image URL to use
+  // Priority 1: CaricatureAvatar from avatarData
+  if (avatarData) {
+    const mode = size === "sm" ? "mini" : size === "seat" || size === "lg" ? "seat" : "full";
+    return (
+      <div
+        className={`${baseClasses} overflow-hidden ${className}`}
+        style={{ width: dim, height: dim, minWidth: dim }}
+      >
+        <CaricatureAvatar data={avatarData} mode={mode} />
+      </div>
+    );
+  }
+
+  // Priority 2: Image URL (DiceBear or uploaded)
   const imageUrl = avatarUrl && !avatarUrl.startsWith("emoji:") && !avatarUrl.startsWith("initials:")
     ? avatarUrl
     : null;
 
   const effectiveUrl = imageUrl || getDefaultDiceBearUrl(displayName);
 
-  // If image hasn't errored, render an <img>
   if (!imgError) {
     return (
       <img

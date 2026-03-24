@@ -11,6 +11,7 @@ import {
   type ActionRequest,
   type HandResult,
   type GameResult,
+  type LegalAction,
 } from "@poker/shared";
 import { connectToGame } from "@/lib/socket";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -25,7 +26,7 @@ export interface GameSocketState {
   gameResults: GameResult[] | null;
   error: string | null;
   connected: boolean;
-  serverLegalActions: string[];
+  serverLegalActions: LegalAction[];
 }
 
 export interface GameSocketActions {
@@ -51,7 +52,7 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
   const [gameResults, setGameResults] = useState<GameResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
-  const [serverLegalActions, setServerLegalActions] = useState<string[]>([]);
+  const [serverLegalActions, setServerLegalActions] = useState<LegalAction[]>([]);
 
   // Helper to append to action log
   const appendLog = useCallback((entry: ActionLogEntry) => {
@@ -113,8 +114,10 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
           if (data.players) {
             setPlayers(data.players);
           }
-          // Clear stale hand result when new state arrives
-          setHandResult(null);
+          // NOTE: Do NOT clear handResult or serverLegalActions here.
+          // GAME_STATE fires after HAND_RESULT (to update stacks) and after
+          // ACTION_REQUIRED (to sync state). Clearing here would wipe both
+          // before the user sees them.
         }
       );
 
@@ -146,6 +149,9 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
             setHoleCards(data.holeCards);
           }
           setHandResult(null);
+          // Don't clear serverLegalActions here — ACTION_REQUIRED fires
+          // immediately after and would get wiped by React batching.
+          // The PlayPage memo guards on isTurn so stale actions won't show.
           setActionLog([]);
           appendLog({
             playerName: "Dealer",
@@ -180,7 +186,13 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
           if (data.tableState) setTableState(data.tableState);
           if (data.players) setPlayers(data.players);
           if (data.legalActions) {
-            setServerLegalActions(data.legalActions.map((a: any) => a.action ?? a.type ?? a));
+            const mapped = data.legalActions.map((a: any) => ({
+              action: a.action ?? a.type ?? a,
+              minAmount: a.minAmount,
+              maxAmount: a.maxAmount,
+            }));
+            console.log("[useGameSocket] ACTION_REQUIRED - setting legal actions:", mapped.map((a: any) => a.action));
+            setServerLegalActions(mapped);
           }
         }
       );
@@ -201,6 +213,9 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
           if (cancelled) return;
           setTableState(data.tableState);
           setPlayers(data.players);
+          // NOTE: Don't clear serverLegalActions here — the server will send
+          // a new ACTION_REQUIRED for the next player's turn. The legalActions
+          // memo in PlayPage already checks isTurn, so stale actions won't show.
 
           const actionMap: Record<string, string> = {
             fold: "folds",
@@ -233,6 +248,7 @@ export function useGameSocket(gameId: string): UseGameSocketReturn {
           };
           console.log("[useGameSocket] Parsed winners:", result.winners?.length);
           setHandResult(result);
+          setServerLegalActions([]);
           if (data.tableState) setTableState(data.tableState);
           if (data.players) setPlayers(data.players);
         }

@@ -19,6 +19,12 @@ export interface AvatarConfig {
   clothesColor: string;
   facialHairColor: string;
   backgroundColor: string;
+  // Body caricature properties (1-10 scale, stored as strings for consistency)
+  height: string;
+  weight: string;
+  neckLength: string;
+  headSize: string;
+  bodyColor: string;
 }
 
 export interface AvatarOption {
@@ -229,6 +235,27 @@ export const BACKGROUND_COLOR_OPTIONS: AvatarOption[] = [
   { value: "f368e0", label: "Magenta" },
 ];
 
+// Body caricature option arrays (1-10 scale)
+const BODY_SCALE_OPTIONS: AvatarOption[] = Array.from({ length: 10 }, (_, i) => ({
+  value: String(i + 1),
+  label: String(i + 1),
+}));
+
+export const BODY_COLOR_OPTIONS: AvatarOption[] = [
+  { value: "25557c", label: "Navy" },
+  { value: "3c4f5c", label: "Dark Teal" },
+  { value: "65c9ff", label: "Sky Blue" },
+  { value: "e6e6e6", label: "Light Gray" },
+  { value: "929598", label: "Gray" },
+  { value: "ff5c5c", label: "Red" },
+  { value: "a7ffc4", label: "Mint" },
+  { value: "ff488e", label: "Hot Pink" },
+  { value: "ffffb1", label: "Yellow" },
+  { value: "262626", label: "Black" },
+  { value: "ffffff", label: "White" },
+  { value: "8b4513", label: "Brown" },
+];
+
 /** Consolidated map of all option arrays keyed by AvatarConfig field name. */
 export const AVATAR_OPTIONS: Record<keyof AvatarConfig, AvatarOption[]> = {
   top: TOP_OPTIONS,
@@ -244,6 +271,11 @@ export const AVATAR_OPTIONS: Record<keyof AvatarConfig, AvatarOption[]> = {
   clothesColor: CLOTHES_COLOR_OPTIONS,
   facialHairColor: FACIAL_HAIR_COLOR_OPTIONS,
   backgroundColor: BACKGROUND_COLOR_OPTIONS,
+  height: BODY_SCALE_OPTIONS,
+  weight: BODY_SCALE_OPTIONS,
+  neckLength: BODY_SCALE_OPTIONS,
+  headSize: BODY_SCALE_OPTIONS,
+  bodyColor: BODY_COLOR_OPTIONS,
 };
 
 // ---- Default Config -------------------------------------------------------
@@ -262,6 +294,11 @@ export const DEFAULT_CONFIG: AvatarConfig = {
   clothesColor: "25557c",
   facialHairColor: "4a312c",
   backgroundColor: "b6e3f4",
+  height: "5",
+  weight: "5",
+  neckLength: "3",
+  headSize: "5",
+  bodyColor: "25557c",
 };
 
 // ---- URL Helpers ----------------------------------------------------------
@@ -313,6 +350,60 @@ export function buildAvatarUrl(config: AvatarConfig): string {
 }
 
 /**
+ * Convert an AvatarConfig to the shared AvatarData type for storage/transport.
+ */
+export function toAvatarData(config: AvatarConfig): import("@poker/shared").AvatarData {
+  return {
+    faceConfig: {
+      top: config.top,
+      accessories: config.accessories,
+      clothing: config.clothing,
+      clothingGraphic: config.clothingGraphic,
+      eyebrows: config.eyebrows,
+      eyes: config.eyes,
+      facialHair: config.facialHair,
+      mouth: config.mouth,
+      hairColor: config.hairColor,
+      clothesColor: config.clothesColor,
+      facialHairColor: config.facialHairColor,
+      backgroundColor: config.backgroundColor,
+    },
+    height: parseInt(config.height) || 5,
+    weight: parseInt(config.weight) || 5,
+    neckLength: parseInt(config.neckLength) || 3,
+    headSize: parseInt(config.headSize) || 5,
+    bodyColor: config.bodyColor || "25557c",
+    skinColor: config.skinColor || "ffdbb4",
+  };
+}
+
+/**
+ * Convert an AvatarData back to AvatarConfig (for the builder).
+ */
+export function fromAvatarData(data: import("@poker/shared").AvatarData): AvatarConfig {
+  return {
+    top: data.faceConfig.top ?? "",
+    accessories: data.faceConfig.accessories ?? "",
+    clothing: data.faceConfig.clothing ?? "",
+    clothingGraphic: data.faceConfig.clothingGraphic ?? "",
+    eyebrows: data.faceConfig.eyebrows ?? "",
+    eyes: data.faceConfig.eyes ?? "",
+    facialHair: data.faceConfig.facialHair ?? "",
+    mouth: data.faceConfig.mouth ?? "",
+    skinColor: data.skinColor,
+    hairColor: data.faceConfig.hairColor ?? "",
+    clothesColor: data.faceConfig.clothesColor ?? "",
+    facialHairColor: data.faceConfig.facialHairColor ?? "",
+    backgroundColor: data.faceConfig.backgroundColor ?? "",
+    height: String(data.height),
+    weight: String(data.weight),
+    neckLength: String(data.neckLength),
+    headSize: String(data.headSize),
+    bodyColor: data.bodyColor,
+  };
+}
+
+/**
  * Parse a DiceBear avataaars URL back into an AvatarConfig.
  * Returns null if the URL is not a valid avataaars URL.
  */
@@ -344,6 +435,12 @@ export function parseAvatarUrl(url: string): AvatarConfig | null {
       clothesColor: p.get("clothesColor") ?? "",
       facialHairColor: p.get("facialHairColor") ?? "",
       backgroundColor: p.get("backgroundColor") ?? "",
+      // Body defaults for URLs that don't have body data
+      height: "5",
+      weight: "5",
+      neckLength: "3",
+      headSize: "5",
+      bodyColor: "25557c",
     };
   } catch {
     return null;
@@ -373,6 +470,11 @@ export function randomizeConfig(): AvatarConfig {
     clothesColor: pickRandom(CLOTHES_COLOR_OPTIONS).value,
     facialHairColor: pickRandom(FACIAL_HAIR_COLOR_OPTIONS).value,
     backgroundColor: pickRandom(BACKGROUND_COLOR_OPTIONS).value,
+    height: String(Math.floor(Math.random() * 10) + 1),
+    weight: String(Math.floor(Math.random() * 10) + 1),
+    neckLength: String(Math.floor(Math.random() * 10) + 1),
+    headSize: String(Math.floor(Math.random() * 10) + 1),
+    bodyColor: pickRandom(BODY_COLOR_OPTIONS).value,
   };
 }
 
@@ -383,6 +485,7 @@ const SECTION_KEYS: Record<string, (keyof AvatarConfig)[]> = {
   outfit: ["clothing", "clothesColor", "clothingGraphic"],
   extras: ["accessories"],
   vibe: ["eyes", "eyebrows", "mouth"],
+  body: ["height", "weight", "neckLength", "headSize", "bodyColor"],
 };
 
 /**
@@ -409,150 +512,59 @@ export function randomizeSection(
 
 // ---- Presets --------------------------------------------------------------
 
+/** Default body props to spread into old presets */
+const DEFAULT_BODY = { height: "5", weight: "5", neckLength: "3", headSize: "5", bodyColor: "25557c" };
+
 export const PRESETS: AvatarPreset[] = [
+  // --- Classic face presets (with normal body) ---
   {
     name: "High Roller",
-    config: {
-      top: "shortFlat",
-      accessories: "sunglasses",
-      clothing: "blazerAndShirt",
-      clothingGraphic: "",
-      eyebrows: "raisedExcited",
-      eyes: "default",
-      facialHair: "",
-      mouth: "twinkle",
-      skinColor: "ffdbb4",
-      hairColor: "2c1b18",
-      clothesColor: "3c4f5c",
-      facialHairColor: "2c1b18",
-      backgroundColor: "ffdfbf",
-    },
+    config: { ...DEFAULT_BODY, top: "shortFlat", accessories: "sunglasses", clothing: "blazerAndShirt", clothingGraphic: "", eyebrows: "raisedExcited", eyes: "default", facialHair: "", mouth: "twinkle", skinColor: "ffdbb4", hairColor: "2c1b18", clothesColor: "3c4f5c", facialHairColor: "2c1b18", backgroundColor: "ffdfbf" },
   },
   {
     name: "Chaos Goblin",
-    config: {
-      top: "shaggy",
-      accessories: "",
-      clothing: "hoodie",
-      clothingGraphic: "",
-      eyebrows: "angry",
-      eyes: "xDizzy",
-      facialHair: "",
-      mouth: "tongue",
-      skinColor: "ffdbb4",
-      hairColor: "c93305",
-      clothesColor: "a7ffc4",
-      facialHairColor: "c93305",
-      backgroundColor: "ff5c5c",
-    },
+    config: { ...DEFAULT_BODY, top: "shaggy", accessories: "", clothing: "hoodie", clothingGraphic: "", eyebrows: "angry", eyes: "xDizzy", facialHair: "", mouth: "tongue", skinColor: "ffdbb4", hairColor: "c93305", clothesColor: "a7ffc4", facialHairColor: "c93305", backgroundColor: "ff5c5c", height: "3", weight: "4", headSize: "7" },
   },
   {
     name: "Old School Grinder",
-    config: {
-      top: "shortCurly",
-      accessories: "prescription01",
-      clothing: "collarAndSweater",
-      clothingGraphic: "",
-      eyebrows: "default",
-      eyes: "default",
-      facialHair: "beardLight",
-      mouth: "serious",
-      skinColor: "d08b5b",
-      hairColor: "e8e1e1",
-      clothesColor: "929598",
-      facialHairColor: "e8e1e1",
-      backgroundColor: "0abf53",
-    },
+    config: { ...DEFAULT_BODY, top: "shortCurly", accessories: "prescription01", clothing: "collarAndSweater", clothingGraphic: "", eyebrows: "default", eyes: "default", facialHair: "beardLight", mouth: "serious", skinColor: "d08b5b", hairColor: "e8e1e1", clothesColor: "929598", facialHairColor: "e8e1e1", backgroundColor: "0abf53" },
   },
   {
     name: "Silent Assassin",
-    config: {
-      top: "shortFlat",
-      accessories: "wayfarers",
-      clothing: "blazerAndSweater",
-      clothingGraphic: "",
-      eyebrows: "flatNatural",
-      eyes: "squint",
-      facialHair: "",
-      mouth: "serious",
-      skinColor: "ae5d29",
-      hairColor: "2c1b18",
-      clothesColor: "3c4f5c",
-      facialHairColor: "2c1b18",
-      backgroundColor: "2d3436",
-    },
+    config: { ...DEFAULT_BODY, top: "shortFlat", accessories: "wayfarers", clothing: "blazerAndSweater", clothingGraphic: "", eyebrows: "flatNatural", eyes: "squint", facialHair: "", mouth: "serious", skinColor: "ae5d29", hairColor: "2c1b18", clothesColor: "3c4f5c", facialHairColor: "2c1b18", backgroundColor: "2d3436", height: "7", weight: "6" },
+  },
+  // --- Funny body presets ---
+  {
+    name: "Giraffe Larry",
+    config: { ...DEFAULT_BODY, top: "shortFlat", accessories: "", clothing: "shirtCrewNeck", clothingGraphic: "", eyebrows: "default", eyes: "surprised", facialHair: "", mouth: "smile", skinColor: "ffdbb4", hairColor: "4a312c", clothesColor: "65c9ff", facialHairColor: "4a312c", backgroundColor: "b6e3f4", height: "9", weight: "3", neckLength: "10", headSize: "4", bodyColor: "65c9ff" },
   },
   {
-    name: "Rich Villain",
-    config: {
-      top: "shortWaved",
-      accessories: "",
-      clothing: "blazerAndShirt",
-      clothingGraphic: "",
-      eyebrows: "raisedExcited",
-      eyes: "default",
-      facialHair: "moustacheFancy",
-      mouth: "twinkle",
-      skinColor: "ffdbb4",
-      hairColor: "2c1b18",
-      clothesColor: "3c4f5c",
-      facialHairColor: "2c1b18",
-      backgroundColor: "c0aede",
-    },
+    name: "Bowling Ball",
+    config: { ...DEFAULT_BODY, top: "shortRound", accessories: "", clothing: "hoodie", clothingGraphic: "", eyebrows: "default", eyes: "happy", facialHair: "", mouth: "smile", skinColor: "ffdbb4", hairColor: "2c1b18", clothesColor: "ff5c5c", facialHairColor: "2c1b18", backgroundColor: "ffdfbf", height: "3", weight: "9", neckLength: "1", headSize: "8", bodyColor: "ff5c5c" },
   },
   {
-    name: "Sleepy Degenerate",
-    config: {
-      top: "shaggy",
-      accessories: "",
-      clothing: "hoodie",
-      clothingGraphic: "",
-      eyebrows: "default",
-      eyes: "closed",
-      facialHair: "",
-      mouth: "default",
-      skinColor: "ffdbb4",
-      hairColor: "4a312c",
-      clothesColor: "929598",
-      facialHairColor: "4a312c",
-      backgroundColor: "b6e3f4",
-    },
+    name: "Four Eyes",
+    config: { ...DEFAULT_BODY, top: "shortCurly", accessories: "prescription01", clothing: "collarAndSweater", clothingGraphic: "", eyebrows: "default", eyes: "squint", facialHair: "", mouth: "grimace", skinColor: "ffdbb4", hairColor: "4a312c", clothesColor: "929598", facialHairColor: "4a312c", backgroundColor: "d1d4f9", height: "4", weight: "7", neckLength: "2", headSize: "7", bodyColor: "929598" },
   },
   {
-    name: "Casino Grandpa",
-    config: {
-      top: "shortRound",
-      accessories: "",
-      clothing: "shirtCrewNeck",
-      clothingGraphic: "",
-      eyebrows: "default",
-      eyes: "happy",
-      facialHair: "beardMajestic",
-      mouth: "smile",
-      skinColor: "d08b5b",
-      hairColor: "e8e1e1",
-      clothesColor: "ff5c5c",
-      facialHairColor: "e8e1e1",
-      backgroundColor: "ffdfbf",
-    },
+    name: "Beanpole",
+    config: { ...DEFAULT_BODY, top: "longButNotTooLong", accessories: "", clothing: "shirtCrewNeck", clothingGraphic: "", eyebrows: "flatNatural", eyes: "default", facialHair: "", mouth: "serious", skinColor: "ae5d29", hairColor: "2c1b18", clothesColor: "3c4f5c", facialHairColor: "2c1b18", backgroundColor: "2d3436", height: "10", weight: "2", neckLength: "7", headSize: "3", bodyColor: "3c4f5c" },
+  },
+  {
+    name: "Big Brain",
+    config: { ...DEFAULT_BODY, top: "shortFlat", accessories: "prescription01", clothing: "blazerAndShirt", clothingGraphic: "", eyebrows: "raisedExcited", eyes: "default", facialHair: "", mouth: "twinkle", skinColor: "ffdbb4", hairColor: "2c1b18", clothesColor: "262626", facialHairColor: "2c1b18", backgroundColor: "c0aede", height: "5", weight: "4", neckLength: "2", headSize: "10", bodyColor: "262626" },
+  },
+  {
+    name: "The Fridge",
+    config: { ...DEFAULT_BODY, top: "theCaesar", accessories: "", clothing: "shirtCrewNeck", clothingGraphic: "", eyebrows: "angry", eyes: "squint", facialHair: "beardMajestic", mouth: "serious", skinColor: "d08b5b", hairColor: "2c1b18", clothesColor: "262626", facialHairColor: "2c1b18", backgroundColor: "1a1a2e", height: "6", weight: "10", neckLength: "1", headSize: "5", bodyColor: "262626" },
   },
   {
     name: "Lucky Maniac",
-    config: {
-      top: "bigHair",
-      accessories: "round",
-      clothing: "graphicShirt",
-      clothingGraphic: "diamond",
-      eyebrows: "raisedExcited",
-      eyes: "surprised",
-      facialHair: "",
-      mouth: "screamOpen",
-      skinColor: "f8d25c",
-      hairColor: "d6b370",
-      clothesColor: "ff488e",
-      facialHairColor: "d6b370",
-      backgroundColor: "f368e0",
-    },
+    config: { ...DEFAULT_BODY, top: "bigHair", accessories: "round", clothing: "graphicShirt", clothingGraphic: "diamond", eyebrows: "raisedExcited", eyes: "surprised", facialHair: "", mouth: "screamOpen", skinColor: "f8d25c", hairColor: "d6b370", clothesColor: "ff488e", facialHairColor: "d6b370", backgroundColor: "f368e0", height: "6", weight: "5", neckLength: "4", headSize: "7", bodyColor: "ff488e" },
+  },
+  {
+    name: "Bobblehead",
+    config: { ...DEFAULT_BODY, top: "fro", accessories: "sunglasses", clothing: "hoodie", clothingGraphic: "", eyebrows: "raisedExcited", eyes: "wink", facialHair: "", mouth: "tongue", skinColor: "ffdbb4", hairColor: "c93305", clothesColor: "a7ffc4", facialHairColor: "c93305", backgroundColor: "0abf53", height: "4", weight: "3", neckLength: "5", headSize: "10", bodyColor: "a7ffc4" },
   },
 ];
 

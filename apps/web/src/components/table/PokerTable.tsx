@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   PublicTableState,
   PublicPlayerState,
   Card,
   PlayerAction,
+  LegalAction,
 } from "@poker/shared";
 import PlayerSeat from "./PlayerSeat";
 import CommunityCards from "./CommunityCards";
@@ -18,7 +19,7 @@ interface PokerTableProps {
   currentUserId: string;
   holeCards: Card[] | null;
   onAction: (action: PlayerAction, amount?: number) => void;
-  legalActions: PlayerAction[];
+  legalActions: LegalAction[];
   actionLog?: ActionLogEntry[];
 }
 
@@ -31,24 +32,23 @@ function formatChips(amount: number): string {
 /* ------------------------------------------------------------------
    Seat positions around the oval table (percentage of container).
 
-   Layout with DEALER at top center:
+   Layout with DEALER centered on felt:
 
-              [DEALER]
         [1]              [2]
-   [0]                        [3]
+   [0]      [ DEALER ]        [3]
         [7]              [4]
            [6]     [5]
    ------------------------------------------------------------------ */
 
 const SEAT_POSITIONS: { top: string; left: string; isBottom: boolean }[] = [
-  { top: "46%", left: "-3%", isBottom: false },   // 0: left
-  { top: "2%", left: "16%", isBottom: false },     // 1: top-left
-  { top: "2%", left: "84%", isBottom: false },     // 2: top-right
-  { top: "46%", left: "103%", isBottom: false },   // 3: right
-  { top: "84%", left: "84%", isBottom: true },     // 4: bottom-right
-  { top: "94%", left: "60%", isBottom: true },     // 5: bottom-center-right
-  { top: "94%", left: "40%", isBottom: true },     // 6: bottom-center-left
-  { top: "84%", left: "16%", isBottom: true },     // 7: bottom-left
+  { top: "46%", left: "0%", isBottom: false },     // 0: left
+  { top: "2%", left: "16%", isBottom: false },      // 1: top-left
+  { top: "2%", left: "84%", isBottom: false },      // 2: top-right
+  { top: "46%", left: "100%", isBottom: false },    // 3: right
+  { top: "84%", left: "84%", isBottom: true },      // 4: bottom-right
+  { top: "94%", left: "62%", isBottom: true },      // 5: bottom-center-right
+  { top: "94%", left: "38%", isBottom: true },      // 6: bottom-center-left
+  { top: "84%", left: "16%", isBottom: true },      // 7: bottom-left
 ];
 
 const DEALER_URL =
@@ -70,6 +70,10 @@ export default function PokerTable({
   const [prevStreet, setPrevStreet] = useState(tableState.street);
   const [isDealing, setIsDealing] = useState(false);
 
+  // Track hand number changes for card dealing animation
+  const prevHandRef = useRef(tableState.handNumber);
+  const [dealingCards, setDealingCards] = useState(false);
+
   useEffect(() => {
     if (tableState.street !== prevStreet) {
       setPrevStreet(tableState.street);
@@ -79,15 +83,35 @@ export default function PokerTable({
     }
   }, [tableState.street, prevStreet]);
 
+  // Trigger dealing animation when a new hand starts
+  useEffect(() => {
+    if (tableState.handNumber > prevHandRef.current) {
+      prevHandRef.current = tableState.handNumber;
+      setDealingCards(true);
+      // Total dealing time: ~2s (8 seats × 150ms × 2 rounds)
+      const t = setTimeout(() => setDealingCards(false), 2400);
+      return () => clearTimeout(t);
+    }
+  }, [tableState.handNumber]);
+
+  // Track pot changes for glow animation
+  const prevPotRef = useRef(tableState.pot);
+  const [potGlow, setPotGlow] = useState(false);
+  useEffect(() => {
+    if (tableState.pot > prevPotRef.current) {
+      setPotGlow(true);
+      const t = setTimeout(() => setPotGlow(false), 1000);
+      prevPotRef.current = tableState.pot;
+      return () => clearTimeout(t);
+    }
+    prevPotRef.current = tableState.pot;
+  }, [tableState.pot]);
+
   const seatMap = new Map<number, PublicPlayerState>();
   for (const p of players) seatMap.set(p.seatNumber, p);
 
   const totalMoney =
     players.reduce((s, p) => s + p.stack + p.currentBet, 0) + tableState.pot;
-
-  // Find SB/BB seats
-  const sbPlayer = players.find((p) => p.isSB);
-  const bbPlayer = players.find((p) => p.isBB);
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#0a0a0a]">
@@ -112,17 +136,19 @@ export default function PokerTable({
           <span className="text-[10px] text-white/40">
             Blinds{" "}
             <span className="font-semibold text-chip-blue">
-              {sbPlayer ? formatChips(tableState.minBet ?? 1) : "?"}
+              ${formatChips(tableState.smallBlind)}
             </span>
             {" / "}
             <span className="font-semibold text-chip-gold">
-              {bbPlayer ? formatChips((tableState.minBet ?? 1) * 2) : "?"}
+              ${formatChips(tableState.bigBlind)}
             </span>
           </span>
         </div>
 
         {/* Center: POT */}
-        <div className="flex items-center gap-1.5 rounded-full bg-black/50 px-4 py-1 ring-1 ring-chip-gold/20">
+        <div className={`flex items-center gap-1.5 rounded-full bg-black/50 px-4 py-1 ring-1 transition-all duration-500 ${
+          potGlow ? "ring-chip-gold/60 shadow-[0_0_12px_rgba(249,168,37,0.3)]" : "ring-chip-gold/20"
+        }`}>
           <span className="text-[10px] font-bold uppercase text-white/40">Pot</span>
           <span className="text-sm font-black text-chip-gold">
             ${formatChips(tableState.pot)}
@@ -145,7 +171,7 @@ export default function PokerTable({
 
       {/* ===== TABLE AREA ===== */}
       <div className="relative flex flex-1 items-center justify-center px-2 py-2">
-        <div className="relative aspect-[16/9] w-full max-w-[1000px]">
+        <div className="relative aspect-[16/9] w-full max-w-[1100px]">
           {/* Rail */}
           <div className="absolute inset-0 rounded-[50%] bg-gradient-to-b from-[#6d4c41] via-table-rail to-[#3e2723] shadow-[0_8px_32px_rgba(0,0,0,0.6)]" />
           <div className="absolute inset-[6px] rounded-[50%] bg-gradient-to-b from-table-rail to-table-border shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]" />
@@ -162,36 +188,60 @@ export default function PokerTable({
             <div className="absolute inset-12 rounded-[50%] border border-white/[0.05]" />
 
             {/* ===== CENTER CONTENT ===== */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
               {/* Community cards */}
               <CommunityCards
                 cards={tableState.communityCards}
                 street={tableState.street}
               />
 
-              {/* Pot on felt */}
-              {tableState.pot > 0 && (
-                <div className="flex items-center gap-2 rounded-full bg-black/40 px-4 py-1.5 shadow-lg backdrop-blur-sm">
-                  <div className="relative h-5 w-4 flex-shrink-0">
-                    <div className="absolute bottom-0 left-0 h-4 w-4 rounded-full bg-gradient-to-br from-chip-red to-red-800 ring-1 ring-black/30" />
-                    <div className="absolute bottom-1 left-0 h-4 w-4 rounded-full bg-gradient-to-br from-chip-gold to-yellow-700 ring-1 ring-black/30" />
-                  </div>
-                  <span className="text-base font-black text-chip-gold">
-                    ${formatChips(tableState.pot)}
+              {/* Dealer avatar — centered on felt */}
+              <div className={`relative ${isDealing || dealingCards ? "animate-pulse" : ""}`}>
+                <div className="absolute -inset-1 rounded-full bg-chip-gold/10 blur-md" />
+                <div
+                  className="relative overflow-hidden rounded-full border-2 border-chip-gold/40 shadow-lg"
+                  style={{ width: "40px", height: "40px" }}
+                >
+                  <img
+                    src={DEALER_URL}
+                    alt="Dealer"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-chip-gold to-yellow-600 px-1.5 py-px shadow">
+                  <span className="text-[6px] font-black uppercase tracking-wider text-black">
+                    Dealer
                   </span>
                 </div>
-              )}
+              </div>
+
+              {/* Pot on felt — always visible during active hands */}
+              <div className={`flex items-center gap-2 rounded-full px-5 py-2 shadow-lg backdrop-blur-sm transition-all duration-500 ${
+                tableState.pot > 0
+                  ? "bg-black/40"
+                  : "bg-black/20"
+              } ${potGlow ? "shadow-[0_0_20px_rgba(249,168,37,0.25)]" : ""}`}>
+                <div className="relative h-5 w-4 flex-shrink-0">
+                  <div className="absolute bottom-0 left-0 h-4 w-4 rounded-full bg-gradient-to-br from-chip-red to-red-800 ring-1 ring-black/30" />
+                  <div className="absolute bottom-1 left-0 h-4 w-4 rounded-full bg-gradient-to-br from-chip-gold to-yellow-700 ring-1 ring-black/30" />
+                </div>
+                <span className={`text-xl font-black transition-colors ${
+                  tableState.pot > 0 ? "text-chip-gold" : "text-white/20"
+                }`}>
+                  ${formatChips(tableState.pot)}
+                </span>
+              </div>
 
               {tableState.pots.length > 1 && (
                 <div className="flex gap-2">
                   {tableState.pots.map((sp, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[10px] text-white/60"
+                      className="flex items-center gap-1 rounded-full bg-black/30 px-2.5 py-1 text-[10px] text-white/60"
                     >
                       <div className="h-2 w-2 rounded-full bg-chip-gold/60" />
                       <span className="font-semibold">
-                        Side {i + 1}: {formatChips(sp.amount)}
+                        {i === 0 ? "Main" : `Side ${i}`}: ${formatChips(sp.amount)}
                       </span>
                     </div>
                   ))}
@@ -200,37 +250,13 @@ export default function PokerTable({
             </div>
           </div>
 
-          {/* ===== DEALER SEAT (top center) ===== */}
-          <div
-            className="absolute -translate-x-1/2 -translate-y-1/2 z-10"
-            style={{ top: "-4%", left: "50%" }}
-          >
-            <div className="flex flex-col items-center gap-0.5">
-              <div className={`relative ${isDealing ? "animate-pulse" : ""}`}>
-                <div className="absolute -inset-1 rounded-full bg-chip-gold/10 blur-md" />
-                <div
-                  className="relative overflow-hidden rounded-full border-2 border-chip-gold/50 shadow-lg"
-                  style={{ width: "52px", height: "52px" }}
-                >
-                  <img
-                    src={DEALER_URL}
-                    alt="Dealer"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-chip-gold to-yellow-600 px-2 py-px shadow">
-                  <span className="text-[7px] font-black uppercase tracking-wider text-black">
-                    Dealer
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* ===== PLAYER SEATS ===== */}
           {SEAT_POSITIONS.map((pos, seatIndex) => {
             const player = seatMap.get(seatIndex) ?? null;
             const isCurrentUser = player?.userId === currentUserId;
+
+            // Stagger dealing animation: seat order from dealer
+            const dealDelay = dealingCards ? seatIndex * 150 : undefined;
 
             return (
               <div
@@ -244,6 +270,7 @@ export default function PokerTable({
                   isCurrentUser={isCurrentUser}
                   holeCards={isCurrentUser ? holeCards : null}
                   isBottom={pos.isBottom}
+                  dealDelay={dealDelay}
                 />
               </div>
             );
@@ -255,13 +282,7 @@ export default function PokerTable({
       {isMyTurn && legalActions.length > 0 && (
         <ActionPanel
           legalActions={legalActions}
-          minBet={tableState.minBet ?? 2}
-          maxBet={currentPlayer?.stack ?? 0}
           pot={tableState.pot}
-          currentBet={
-            Math.max(...players.map((p) => p.currentBet)) -
-            (currentPlayer?.currentBet ?? 0)
-          }
           onAction={onAction}
         />
       )}

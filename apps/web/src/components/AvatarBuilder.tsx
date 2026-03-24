@@ -6,6 +6,7 @@ import {
   AVATAR_OPTIONS,
   PRESETS,
   VIBE_COMBOS,
+  BODY_COLOR_OPTIONS,
   buildAvatarUrl,
   randomizeConfig,
   randomizeSection,
@@ -16,13 +17,14 @@ interface AvatarBuilderProps {
   onConfigChange: (config: AvatarConfig) => void;
 }
 
-type TabId = "face" | "hair" | "outfit" | "extras" | "vibe";
+type TabId = "face" | "hair" | "outfit" | "extras" | "body" | "vibe";
 
 const TABS: { id: TabId; label: string; emoji: string }[] = [
   { id: "face", label: "Face", emoji: "\u{1F3AD}" },
   { id: "hair", label: "Hair", emoji: "\u{1F487}" },
   { id: "outfit", label: "Outfit", emoji: "\u{1F454}" },
   { id: "extras", label: "Extras", emoji: "\u{1F3A9}" },
+  { id: "body", label: "Body", emoji: "\u{1F4AA}" },
   { id: "vibe", label: "Vibe", emoji: "\u{1F60E}" },
 ];
 
@@ -31,6 +33,7 @@ const TAB_SECTION_MAP: Record<TabId, string> = {
   hair: "hair",
   outfit: "outfit",
   extras: "extras",
+  body: "body",
   vibe: "vibe",
 };
 
@@ -329,6 +332,62 @@ export default function AvatarBuilder({
     );
   }
 
+  function BodySlider({
+    label,
+    sublabel,
+    field,
+    minLabel,
+    maxLabel,
+  }: {
+    label: string;
+    sublabel: string;
+    field: keyof AvatarConfig;
+    minLabel: string;
+    maxLabel: string;
+  }) {
+    const value = parseInt(config[field]) || 5;
+    return (
+      <div>
+        <div className="flex items-baseline justify-between mb-1">
+          <SectionLabel>{label}</SectionLabel>
+          <span className="text-[10px] text-white/40 italic">{sublabel}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-white/40 w-14 text-right">{minLabel}</span>
+          <input
+            type="range"
+            min={1}
+            max={10}
+            value={value}
+            onChange={(e) => updateField(field, e.target.value)}
+            className="flex-1 h-2 cursor-pointer appearance-none rounded-full bg-white/10 accent-felt-400"
+          />
+          <span className="text-[10px] text-white/40 w-14">{maxLabel}</span>
+          <span className="w-8 text-center text-sm font-bold text-felt-300">{value}</span>
+        </div>
+      </div>
+    );
+  }
+
+  function renderBodyTab() {
+    return (
+      <div className="space-y-5">
+        <BodySlider label="How Tall?" sublabel="height" field="height" minLabel="Tiny" maxLabel="Giant" />
+        <BodySlider label="How Thicc?" sublabel="weight" field="weight" minLabel="Stick" maxLabel="Absolute Unit" />
+        <BodySlider label="Neck Situation" sublabel="neck length" field="neckLength" minLabel="Normal" maxLabel="Giraffe Mode" />
+        <BodySlider label="Big Head Energy" sublabel="head size" field="headSize" minLabel="Pea" maxLabel="Bobblehead" />
+        <div>
+          <SectionLabel>Shirt Color</SectionLabel>
+          <ColorRow
+            options={BODY_COLOR_OPTIONS}
+            selectedValue={config.bodyColor}
+            onChange={(v) => updateField("bodyColor", v)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   function renderVibeTab() {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -358,6 +417,7 @@ export default function AvatarBuilder({
     hair: renderHairTab,
     outfit: renderOutfitTab,
     extras: renderExtrasTab,
+    body: renderBodyTab,
     vibe: renderVibeTab,
   };
 

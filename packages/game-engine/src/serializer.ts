@@ -6,6 +6,7 @@ import type {
   PublicTableState,
   PrivatePlayerState,
   PublicPlayerState,
+  AvatarData,
 } from '@poker/shared';
 import { GameState } from './state';
 
@@ -22,6 +23,7 @@ export function toPublicTableState(gameState: GameState): PublicTableState {
 export function toPublicPlayerStates(
   gameState: GameState,
   avatarUrls?: Map<string, string>,
+  avatarDataMap?: Map<string, AvatarData>,
 ): PublicPlayerState[] {
   const players: PublicPlayerState[] = [];
 
@@ -34,6 +36,7 @@ export function toPublicPlayerStates(
       seatNumber: i,
       displayName: player.displayName,
       avatarUrl: avatarUrls?.get(player.userId),
+      avatarData: avatarDataMap?.get(player.userId),
       stack: player.stack,
       isFolded: player.isFolded,
       isAllIn: player.isAllIn,

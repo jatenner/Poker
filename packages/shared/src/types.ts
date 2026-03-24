@@ -65,6 +65,7 @@ export interface GameSeat {
   userId?: string;
   displayName?: string;
   avatarUrl?: string;
+  avatarData?: AvatarData;
   status: SeatStatus;
   stack: number;
 }
@@ -76,6 +77,7 @@ export interface PublicPlayerState {
   seatNumber: number;
   displayName: string;
   avatarUrl?: string;
+  avatarData?: AvatarData;
   stack: number;
   isFolded: boolean;
   isAllIn: boolean;
@@ -109,10 +111,30 @@ export interface PublicTableState {
   dealerSeat: number;
   currentTurn?: number;
   minBet?: number;
+  smallBlind: number;
+  bigBlind: number;
   handNumber: number;
 }
 
+// --- Avatar ---
+
+export interface AvatarData {
+  faceConfig: Record<string, string>;
+  height: number;       // 1-10 (1=very short, 10=very tall)
+  weight: number;       // 1-10 (1=very thin, 10=very wide)
+  neckLength: number;   // 1-10 (1=no neck, 10=giraffe)
+  headSize: number;     // 1-10 (1=tiny head, 10=bobblehead)
+  bodyColor: string;    // shirt/body hex color
+  skinColor: string;    // skin hex color for body
+}
+
 // --- Actions ---
+
+export interface LegalAction {
+  action: PlayerAction;
+  minAmount?: number;
+  maxAmount?: number;
+}
 
 export interface ActionRequest {
   type: PlayerAction;

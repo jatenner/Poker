@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import type { PlayerAction } from "@poker/shared";
+import type { PlayerAction, LegalAction } from "@poker/shared";
 import PokerTable from "@/components/table/PokerTable";
 import AvatarDisplay from "@/components/AvatarDisplay";
 import { useAuthContext } from "@/contexts/AuthContext";
@@ -60,17 +60,12 @@ export default function PlayPage() {
     }
   }, [shouldStart, connected, tableState, startGame]);
 
-  // Use server-provided legal actions (authoritative)
-  const legalActions = useMemo<PlayerAction[]>(() => {
+  // Use server-provided legal actions (authoritative — no fallback)
+  const legalActions = useMemo<LegalAction[]>(() => {
     if (!tableState || !currentUserId) return [];
     const currentPlayer = players.find((p) => p.userId === currentUserId);
     if (!currentPlayer?.isTurn) return [];
-    // Use server-sent legal actions if available
-    if (serverLegalActions.length > 0) {
-      return serverLegalActions as PlayerAction[];
-    }
-    // Fallback: basic guess
-    return ["fold", "check", "call", "raise", "all-in"];
+    return serverLegalActions;
   }, [tableState, players, currentUserId, serverLegalActions]);
 
   const handleAction = useCallback(
@@ -329,17 +324,21 @@ export default function PlayPage() {
                   </div>
 
                   {/* Winning hand */}
-                  {mainWinner.hand && (
+                  {mainWinner.hand ? (
                     <div className="inline-block rounded-full bg-chip-gold/15 px-4 py-1 text-sm font-bold text-chip-gold mb-3">
                       🃏 {mainWinner.hand}
                     </div>
+                  ) : (
+                    <div className="inline-block rounded-full bg-white/10 px-4 py-1 text-sm font-bold text-white/50 mb-3">
+                      Everyone folded
+                    </div>
                   )}
 
-                  {/* Chips won */}
+                  {/* Pot won */}
                   <div className="text-3xl font-black text-chip-gold mt-1">
-                    💰 +{formatChips(mainWinner.amount)}
+                    💰 +${formatChips(mainWinner.amount)}
                   </div>
-                  <div className="text-xs text-white/40 mt-1">chips won</div>
+                  <div className="text-xs text-white/40 mt-1">pot won</div>
 
                   {/* Split pot */}
                   {handResult.winners.length > 1 && (
@@ -350,7 +349,7 @@ export default function PlayPage() {
                         return (
                           <div key={i} className="flex items-center justify-between text-sm px-2">
                             <span className="text-white/70">{w.userId === currentUserId ? "You" : (p?.displayName ?? "Player")}</span>
-                            <span className="text-chip-gold font-black">+{formatChips(w.amount)}</span>
+                            <span className="text-chip-gold font-black">+${formatChips(w.amount)}</span>
                           </div>
                         );
                       })}

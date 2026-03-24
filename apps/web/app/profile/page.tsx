@@ -11,7 +11,10 @@ import {
   DEFAULT_CONFIG,
   buildAvatarUrl,
   parseAvatarUrl,
+  toAvatarData,
+  fromAvatarData,
 } from "@/lib/avatarConfig";
+import CaricatureAvatar from "@/components/CaricatureAvatar";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -59,6 +62,18 @@ export default function ProfilePage() {
       setDisplayName(profile.display_name ?? "");
       setAvatarUrl(profile.avatar_url ?? null);
 
+      // Priority: avatar_data (caricature) > avatar_url (DiceBear/upload)
+      if ((profile as any).avatar_data) {
+        try {
+          const restored = fromAvatarData((profile as any).avatar_data);
+          setConfig(restored);
+          setMode("build");
+          return;
+        } catch {
+          // Fall through to URL-based restore
+        }
+      }
+
       if (profile.avatar_url) {
         const parsed = parseAvatarUrl(profile.avatar_url);
         if (parsed) {
@@ -68,7 +83,6 @@ export default function ProfilePage() {
           !profile.avatar_url.startsWith("emoji:") &&
           !profile.avatar_url.startsWith("initials:")
         ) {
-          // It's an uploaded image URL
           setMode("upload");
         } else {
           setConfig(DEFAULT_CONFIG);
@@ -163,12 +177,14 @@ export default function ProfilePage() {
     setMessage(null);
 
     const finalAvatarUrl = mode === "build" ? currentBuildUrl : avatarUrl;
+    const avatarData = mode === "build" ? toAvatarData(config) : null;
 
     const supabase = createBrowserClient();
     const { error } = await supabase.from("profiles").upsert({
       id: user.id,
       display_name: displayName.trim(),
       avatar_url: finalAvatarUrl,
+      avatar_data: avatarData,
       updated_at: new Date().toISOString(),
     });
 
@@ -213,51 +229,61 @@ export default function ProfilePage() {
         {/* Preview Section */}
         <div className="card-surface">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 sm:gap-10">
-            {/* Left: Large avatar preview */}
+            {/* Left: Full Body Caricature Preview */}
             <div className="flex flex-col items-center gap-3">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
                 Your Avatar
               </h2>
-              <div className="relative">
-                <div className="absolute -inset-3 rounded-full bg-felt-400/20 blur-xl" />
-                <div className="relative overflow-hidden rounded-full border-[3px] border-felt-400/50 shadow-xl">
-                  <div
-                    className="rounded-full overflow-hidden bg-gradient-to-br from-felt-500 to-felt-700"
-                    style={{ width: "120px", height: "120px" }}
-                  >
-                    {previewUrl ? (
-                      <img
-                        src={previewUrl}
-                        alt="Avatar preview"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-3xl font-bold text-white">
-                        {displayName?.[0]?.toUpperCase() ?? "?"}
-                      </div>
-                    )}
+              {mode === "build" ? (
+                <div className="relative" style={{ width: 200, height: 280 }}>
+                  <div className="absolute -inset-4 rounded-3xl bg-felt-400/15 blur-2xl" />
+                  <div className="relative h-full rounded-3xl border-2 border-felt-400/40 bg-gradient-to-b from-felt-900/70 to-black/50 p-4 shadow-2xl overflow-hidden">
+                    <CaricatureAvatar data={toAvatarData(config)} mode="full" />
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="relative">
+                  <div className="absolute -inset-3 rounded-full bg-felt-400/20 blur-xl" />
+                  <div className="relative overflow-hidden rounded-full border-[3px] border-felt-400/50 shadow-xl">
+                    <div
+                      className="rounded-full overflow-hidden bg-gradient-to-br from-felt-500 to-felt-700"
+                      style={{ width: "120px", height: "120px" }}
+                    >
+                      {previewUrl ? (
+                        <img
+                          src={previewUrl}
+                          alt="Avatar preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-3xl font-bold text-white">
+                          {displayName?.[0]?.toUpperCase() ?? "?"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="text-sm font-semibold text-chip-gold">
                 {displayName || "Your Name"}
               </div>
             </div>
 
-            {/* Right: Table Preview */}
+            {/* Right: Table Preview (how it looks at the seat) */}
             <div className="flex flex-col items-center gap-3">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
                 Table Preview
               </h2>
-              <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/[0.06] bg-gradient-to-b from-felt-900/40 to-black/30 px-10 py-5">
+              <div className="flex flex-col items-center gap-2 rounded-2xl border border-white/[0.06] bg-gradient-to-b from-felt-900/40 to-black/30 px-12 py-6">
                 {/* Glow ring */}
                 <div className="relative">
-                  <div className="absolute -inset-1.5 rounded-full bg-felt-400/20 blur-md" />
-                  <div className="relative overflow-hidden rounded-full border-[2.5px] border-felt-400/60 shadow-lg">
+                  <div className="absolute -inset-2 rounded-full bg-felt-400/25 blur-lg" />
+                  <div className="relative overflow-hidden rounded-full border-[3px] border-felt-400/60 shadow-xl" style={{ width: 96, height: 96 }}>
                     <AvatarDisplay
                       avatarUrl={previewUrl}
+                      avatarData={mode === "build" ? toAvatarData(config) : undefined}
                       displayName={displayName}
-                      size="lg"
+                      size="xl"
                     />
                   </div>
                 </div>
@@ -265,8 +291,8 @@ export default function ProfilePage() {
                   {displayName || "Your Name"}
                 </div>
                 <div className="flex items-center gap-1 text-sm font-bold text-felt-300">
-                  <span className="text-felt-400/60">$</span>
-                  1,000
+                  <span>🪙</span>
+                  $1,000
                 </div>
               </div>
             </div>

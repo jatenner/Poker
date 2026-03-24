@@ -228,6 +228,7 @@ export interface SeatedPlayer {
   userId: string;
   displayName: string;
   avatarUrl: string | null;
+  avatarData: Record<string, unknown> | null;
   chips: number;
   cashBuyIn: number;
 }
@@ -239,7 +240,7 @@ export async function fetchSeatedPlayers(
   // Get occupied seats with profile info
   const { data: seatRows, error: seatErr } = await supabase()
     .from('game_seats')
-    .select('seat_number, user_id, profiles!game_seats_user_id_fkey(display_name, avatar_url)')
+    .select('seat_number, user_id, profiles!game_seats_user_id_fkey(display_name, avatar_url, avatar_data)')
     .eq('game_id', gameId)
     .eq('status', 'occupied');
 
@@ -270,6 +271,7 @@ export async function fetchSeatedPlayers(
         userId: s.user_id,
         displayName: profile?.display_name ?? s.user_id.slice(0, 8),
         avatarUrl: profile?.avatar_url ?? null,
+        avatarData: profile?.avatar_data ?? null,
         chips: bi.chips > 0 ? bi.chips : Math.floor(bi.cash / chipValue),
         cashBuyIn: bi.cash,
       };
