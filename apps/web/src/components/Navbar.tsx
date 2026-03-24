@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuthContext } from "@/contexts/AuthContext";
+import AvatarDisplay from "@/components/AvatarDisplay";
 
 export default function Navbar() {
   const { user, profile, loading, signOut } = useAuthContext();
@@ -35,19 +36,11 @@ export default function Navbar() {
                 href="/profile"
                 className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-secondary)] transition hover:text-[var(--color-text-primary)]"
               >
-                {profile?.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt=""
-                    className="h-7 w-7 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-felt-800 text-xs font-bold text-felt-300">
-                    {profile?.display_name?.[0]?.toUpperCase() ??
-                      user.email?.[0]?.toUpperCase() ??
-                      "?"}
-                  </span>
-                )}
+                <AvatarDisplay
+                  avatarUrl={profile?.avatar_url}
+                  displayName={profile?.display_name ?? user.email}
+                  size="sm"
+                />
                 <span className="hidden sm:inline">
                   {profile?.display_name ?? user.email}
                 </span>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContext";
 import BuyInModal from "@/components/BuyInModal";
+import AvatarDisplay from "@/components/AvatarDisplay";
 import type { GameStatus, SeatStatus } from "@poker/shared";
 
 /* ------------------------------------------------------------------ */
@@ -160,7 +161,7 @@ function PokerSeat({
     <div className="flex flex-col items-center gap-0.5">
       {/* Avatar ring */}
       <div
-        className={`relative flex h-14 w-14 items-center justify-center rounded-full border-2 transition
+        className={`relative overflow-hidden rounded-full border-2 transition
           ${isCurrentUser
             ? "border-felt-400 shadow-[0_0_12px_rgba(102,187,106,0.4)]"
             : isSittingOut
@@ -168,21 +169,13 @@ function PokerSeat({
             : "border-white/20"
           }`}
       >
-        {seat.avatarUrl ? (
-          <img
-            src={seat.avatarUrl}
-            alt={seat.displayName ?? "Player"}
-            className="h-full w-full rounded-full object-cover"
-          />
-        ) : (
-          <span
-            className={`flex h-full w-full items-center justify-center rounded-full text-base font-bold text-white ${colorClass}`}
-          >
-            {initials}
-          </span>
-        )}
+        <AvatarDisplay
+          avatarUrl={seat.avatarUrl}
+          displayName={seat.displayName}
+          size="lg"
+        />
         {isSittingOut && (
-          <span className="absolute -bottom-0.5 rounded-full bg-black/80 px-1.5 text-[8px] font-semibold text-[var(--color-text-secondary)]">
+          <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-1.5 text-[8px] font-semibold text-[var(--color-text-secondary)]">
             Away
           </span>
         )}
@@ -193,11 +186,11 @@ function PokerSeat({
         className={`mt-0.5 rounded-md px-2 py-0.5 text-center
           ${isCurrentUser ? "bg-felt-800/60" : "bg-black/50"}`}
       >
-        <div className="max-w-[80px] truncate text-[11px] font-semibold text-white">
+        <div className="max-w-[90px] truncate text-xs font-semibold text-white">
           {seat.displayName ?? "Player"}
         </div>
         {seat.buyInAmount != null && (
-          <div className="text-[10px] font-medium text-chip-gold">
+          <div className="text-[11px] font-medium text-chip-gold">
             ${seat.buyInAmount.toFixed(2)}
           </div>
         )}

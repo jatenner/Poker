@@ -2,6 +2,7 @@
 
 import type { PublicPlayerState, Card } from "@poker/shared";
 import PlayingCard from "./PlayingCard";
+import AvatarDisplay from "@/components/AvatarDisplay";
 
 interface PlayerSeatProps {
   player: PublicPlayerState | null;
@@ -16,15 +17,6 @@ function formatChips(amount: number): string {
   if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`;
   if (amount >= 10_000) return `${(amount / 1_000).toFixed(1)}K`;
   return amount.toLocaleString();
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 }
 
 const ACTION_LABELS: Record<string, string> = {
@@ -101,14 +93,14 @@ export default function PlayerSeat({
         {/* Turn glow effect */}
         {isTurn && (
           <>
-            <div className="absolute -inset-2 animate-pulse rounded-full bg-chip-gold/30 blur-md" />
-            <div className="absolute -inset-1 rounded-full bg-chip-gold/20 blur-sm" />
+            <div className="absolute -inset-2.5 animate-pulse rounded-full bg-chip-gold/30 blur-md" />
+            <div className="absolute -inset-1.5 rounded-full bg-chip-gold/20 blur-sm" />
           </>
         )}
 
         {/* Avatar circle */}
         <div
-          className={`relative h-14 w-14 overflow-hidden rounded-full border-[2.5px] shadow-lg transition-all duration-300 ${
+          className={`relative overflow-hidden rounded-full border-[2.5px] shadow-lg transition-all duration-300 ${
             isTurn
               ? "border-chip-gold shadow-chip-gold/40"
               : isAllIn
@@ -118,23 +110,11 @@ export default function PlayerSeat({
                   : "border-white/15"
           }`}
         >
-          {player.avatarUrl ? (
-            <img
-              src={player.avatarUrl}
-              alt={player.displayName}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div
-              className={`flex h-full w-full items-center justify-center text-sm font-bold text-white ${
-                isCurrentUser
-                  ? "bg-gradient-to-br from-felt-500 to-felt-700"
-                  : "bg-gradient-to-br from-gray-600 to-gray-800"
-              }`}
-            >
-              {getInitials(player.displayName)}
-            </div>
-          )}
+          <AvatarDisplay
+            avatarUrl={player.avatarUrl}
+            displayName={player.displayName}
+            size="lg"
+          />
 
           {/* Folded overlay */}
           {isFolded && (
@@ -177,7 +157,7 @@ export default function PlayerSeat({
 
       {/* Name plate */}
       <div
-        className={`mt-1.5 max-w-[80px] truncate text-center text-xs font-semibold ${
+        className={`mt-1.5 max-w-[90px] truncate text-center text-sm font-semibold ${
           isCurrentUser ? "text-chip-gold" : "text-white/90"
         }`}
       >
@@ -185,7 +165,7 @@ export default function PlayerSeat({
       </div>
 
       {/* Stack */}
-      <div className="flex items-center gap-1 text-[11px] font-bold text-felt-300">
+      <div className="flex items-center gap-1 text-sm font-bold text-felt-300">
         <span className="text-felt-400/60">$</span>
         {formatChips(player.stack)}
       </div>
